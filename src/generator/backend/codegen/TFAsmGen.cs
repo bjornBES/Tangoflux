@@ -9,11 +9,15 @@ public enum SectionStatus
 public class TFAsmGen
 {
     ICallingConvention CallingConvention;
+    SectionStatus status = SectionStatus.NONE;
+    private FunctionFrame currentFrame;
+    private RegisterTracker currentRegisterTracker;
+
     public TFAsmGen(ICallingConvention callingConvention)
     {
         CallingConvention = callingConvention;
     }
-    SectionStatus status = SectionStatus.NONE;
+
     public string Text()
     {
         if (status != SectionStatus.TEXT)
@@ -43,19 +47,20 @@ public class TFAsmGen
     public string Value(int value) => $".value {value}";
     public string Long(int value) => $".long {value}";
 
-    public string EnterFunction(string name, int locals, ICallingConvention conv, RegisterProfile profile)
+    public FunctionFrame EnterFunction(string name, int locals, ICallingConvention conv, RegisterProfile profile)
     {
-        FunctionFrame functionFrame = new FunctionFrame()
+        FunctionFrame frame = new FunctionFrame
         {
             FunctionName = name,
             LocalSize = locals,
-            UseFramePointer = true,
-            StackAlignment = 16
+            StackAlignment = conv.StackAlignment,
+            UseFramePointer = true // or decide later
         };
-        functionFrame.CalleeSavedUsed.Add(new RegisterInfo("rbx", 0));
-        functionFrame.CalleeSavedUsed.Add(new RegisterInfo("r12", 12));
 
-        return PrologueEpilogueGenerator.GeneratePrologue(functionFrame, conv, profile);
+        currentFrame = frame;
+        currentRegisterTracker = new RegisterTracker(frame, conv, profile);
+
+        return frame;
     }
 
     public string LeaveFunction(string name, int locals, ICallingConvention conv, RegisterProfile profile)
@@ -70,5 +75,43 @@ public class TFAsmGen
         functionFrame.CalleeSavedUsed.Add(new RegisterInfo("rbx", 0));
         functionFrame.CalleeSavedUsed.Add(new RegisterInfo("r12", 12));
         return PrologueEpilogueGenerator.GenerateEpilogue(functionFrame, conv, profile);
+    }
+
+    public string Move(AsmOperand dst, AsmOperand src)
+    {
+        if (dst is RegOperand r)
+        {
+            currentRegisterTracker.Use(r.Register);
+        }
+
+        return $"    mov {dst}, {src}";
+    }
+
+    public string ZeroReg(RegOperand src)
+    {
+        return $"    xor {src}, {src}";
+    }
+    public string Push(AsmOperand src)
+    {
+        return $"    push {src}";
+    }
+
+    public string Jump(AsmOperand src)
+    {
+        string address = "";
+        if (src is RegOperand r)
+        {
+            
+        }
+        else if (src is MemOperand mem)
+        {
+            
+        }
+        else if (src is LableOperand lable)
+        {
+            address = lable.ToString();
+        }
+        
+        return $"    jmp {address}";
     }
 }

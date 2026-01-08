@@ -36,8 +36,8 @@ public class Program
         TangoFlexLexer tangoFlexLexer = new TangoFlexLexer(src, arguments);
         TangoFlexParser tangoFlexParser = new TangoFlexParser(tangoFlexLexer.Tokens.ToArray(), arguments);
         TangoFlexIRParser tangoFlexIRParser = new TangoFlexIRParser(tangoFlexParser.AST, arguments);
-        // TangoFlexGenerator tangoFlexGenerator = new TangoFlexGenerator(tangoFlexParser.AST, arguments);
-        // File.WriteAllText(arguments.OutputFile, string.Join(Environment.NewLine, tangoFlexGenerator.Output));
+        TangoFlexGenerator tangoFlexGenerator = new TangoFlexGenerator(tangoFlexIRParser.Module, arguments);
+        File.WriteAllText(arguments.OutputFile, string.Join(Environment.NewLine, tangoFlexGenerator.Output));
 
         Console.WriteLine("Hello world");
     }

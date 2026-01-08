@@ -15,4 +15,7 @@ public class FunctionFrame
     public int StackAlignment { get; set; } = 16;
     /// <summary>If true, function is leaf (no calls) so caller-saved could sometimes be reused; generator doesn't currently optimize for leafness except frame-pointer omission.</summary>
     public bool IsLeaf { get; set; } = false;
+
+    // Registers touched by this function (any usage)
+    public HashSet<RegisterInfo> RegistersUsed = new HashSet<RegisterInfo>();
 }

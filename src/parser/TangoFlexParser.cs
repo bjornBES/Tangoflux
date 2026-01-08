@@ -1,4 +1,7 @@
+using System.Diagnostics;
+using System.Net.Http.Headers;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using CompilerTangoFlex.lexer;
 
 public class TangoFlexParser
@@ -24,7 +27,7 @@ public class TangoFlexParser
 
         Token token = Peek();
 
-                Console.WriteLine($"[parseTerm] Kind = {token.Kind}");
+        Console.WriteLine($"[parseTerm] Kind = {token.Kind}");
         switch (token.Kind)
         {
             case TokenKind.INT:
@@ -53,20 +56,47 @@ public class TangoFlexParser
 
     NodeType parseType()
     {
-        NodeType nodeType = new NodeType();
-        TokenKeyword keywordType = Peek<TokenKeyword>(TokenKind.KEYWORD);
-        switch (keywordType.Val)
+        // 1. Parse base type
+        TokenKeyword baseToken = Expect<TokenKeyword>(TokenKind.KEYWORD, "Expected Type");
+
+        switch (baseToken.Val)
         {
+            case KeywordVal.INT8:
+            case KeywordVal.UINT8:
+            case KeywordVal.INT16:
+            case KeywordVal.UINT16:
+            case KeywordVal.INT:
+            case KeywordVal.UINT32:
+            case KeywordVal.INT64:
+            case KeywordVal.UINT64:
             case KeywordVal.FLOAT:
             case KeywordVal.BOOL:
-            case KeywordVal.INT:
-            case KeywordVal.STRING:
             case KeywordVal.VOID:
-                nodeType.type = keywordType.Val;
-                Advance();
+            case KeywordVal.STRING:
+                break;
+            
+            case KeywordVal.PTR:
+                ThrowError("Type cannot start with ptr");
                 break;
         }
-        return nodeType;
+
+        NodeType type = new NodeType
+        {
+            Type = baseToken.Val,
+            NestedTypes = null
+        };
+
+        // 2. Wrap in ptrs (LEFT → RIGHT)
+        while (MatchKeyword(KeywordVal.PTR, out _))
+        {
+            type = new NodeType
+            {
+                Type = KeywordVal.PTR,
+                NestedTypes = type
+            };
+        }
+
+        return type;
     }
 
     NodeStmtFuncDecl parseStmtFuncDecl()
@@ -76,7 +106,21 @@ public class TangoFlexParser
         ExpectKeyword(KeywordVal.FUNC, "", out TokenKeyword _);
         Expect(TokenKind.IDENTIFIER, "", out TokenIdentifier funcName);
         ExpectOperator(OperatorVal.LPAREN, "", out TokenOperator _);
-        // TODO:
+        while (true)
+        {
+            Expect(TokenKind.IDENTIFIER, "", out TokenIdentifier argName);
+            ExpectOperator(OperatorVal.COLON, "", out TokenOperator _);
+            NodeType argType = parseType();
+
+
+            Arguments.Add(new FuncArguments(argName.Val, argType));
+
+            if (!MatchOperator(OperatorVal.COMMA, out TokenOperator _))
+            {
+                Console.WriteLine(Peek());
+                break;
+            }
+        }
         ExpectOperator(OperatorVal.RPAREN, "", out TokenOperator _);
         ExpectOperator(OperatorVal.COLON, "", out TokenOperator _);
         NodeType type = parseType();
@@ -85,7 +129,7 @@ public class TangoFlexParser
         stmtFuncDecl.returnType = type;
         stmtFuncDecl.funcName = funcName.Val;
         stmtFuncDecl.scope = scope;
-        stmtFuncDecl.arguments = Arguments;
+        stmtFuncDecl.parameters = Arguments;
 
         return stmtFuncDecl;
     }
@@ -169,8 +213,14 @@ public class TangoFlexParser
                 Console.WriteLine($"Keyword dose not have a case {keyword}");
             }
         }
-        else
+        else if (Peek().Kind == TokenKind.OPERATOR)
         {
+            TokenOperator _operator = Peek<TokenOperator>(TokenKind.OPERATOR);
+            // it's 100% a scope
+            if (_operator.Val == OperatorVal.LCURL)
+            {
+                stmt.stmt = parseScope();
+            }
         }
 
         return stmt;
@@ -179,6 +229,12 @@ public class TangoFlexParser
     public void ParseProgNode()
     {
         List<NodeStmt> stmts = new List<NodeStmt>();
+
+        JsonSerializerOptions serializerOptions = new JsonSerializerOptions()
+        {
+            WriteIndented = true,
+        };
+        serializerOptions.Converters.Add(new JsonStringEnumConverter());
 
         while (Peek() != null && Peek().Kind != TokenKind.NONE)
         {
@@ -191,7 +247,7 @@ public class TangoFlexParser
                 {
                     AST = new NodeProg();
                     AST.stmts = stmts;
-                    string json = JsonSerializer.Serialize(AST, new JsonSerializerOptions() { WriteIndented = true });
+                    string json = JsonSerializer.Serialize(AST, serializerOptions);
                     File.WriteAllText(debugFile, json);
                     Console.WriteLine("Writing into parser debug file");
                 }
@@ -204,16 +260,25 @@ public class TangoFlexParser
         AST.stmts = stmts;
         if (debug)
         {
-            string json = JsonSerializer.Serialize(AST, new JsonSerializerOptions() { WriteIndented = true });
+            string json = JsonSerializer.Serialize(AST, serializerOptions);
             File.WriteAllText(debugFile, json);
         }
     }
 
     Token Peek(int offset = 0)
-        => TokensIndex + offset < Tokens.Length ? Tokens[TokensIndex + offset] : null;
+    {
+        if (TokensIndex + offset < Tokens.Length)
+        {
+            return Tokens[TokensIndex + offset];
+        }
+        return null;
+    }
 
     Token Advance()
-        => Tokens[TokensIndex++];
+    {
+        Console.WriteLine($"{Tokens[TokensIndex]}");
+        return Tokens[TokensIndex++];
+    }
 
     bool Match(TokenKind type)
     {
@@ -232,7 +297,34 @@ public class TangoFlexParser
             value = (T)Advance();
             return true;
         }
+
         value = null;
+        return false;
+    }
+    bool MatchOperator(OperatorVal keyword, out TokenOperator value)
+    {
+        bool IsX = Match(TokenKind.OPERATOR, out value);
+
+        if (IsX && value != null && value.Val == keyword)
+        {
+            return true;
+        }
+        if (value != null)
+        {
+            TokensIndex--;
+        }
+        return false;
+    }
+    bool MatchKeyword(KeywordVal keyword, out TokenKeyword value)
+    {
+        if (Match(TokenKind.KEYWORD, out value) && value != null && value.Val == keyword)
+        {
+            return true;
+        }
+        if (value != null)
+        {
+            TokensIndex--;
+        }
         return false;
     }
 
@@ -247,16 +339,22 @@ public class TangoFlexParser
         if (!Match(type, out value))
             ThrowError($"Expected {type}: {msg}");
     }
+    T Expect<T>(TokenKind type, string msg) where T : Token
+    {
+        if (!Match(type, out T value))
+            ThrowError($"Expected {type}: {msg}");
+        return value;
+    }
 
     void ExpectKeyword(KeywordVal keyword, string msg, out TokenKeyword value)
     {
-        if (!Match(TokenKind.KEYWORD, out value) && value.Val == keyword)
+        if (!Match(TokenKind.KEYWORD, out value) || value == null || value.Val != keyword)
             ThrowError($"Expected keyword {keyword}: {msg}");
     }
 
     void ExpectOperator(OperatorVal keyword, string msg, out TokenOperator value)
     {
-        if (!Match(TokenKind.OPERATOR, out value) && value == null && value.Val == keyword)
+        if (!Match(TokenKind.OPERATOR, out value) || value == null || value.Val != keyword)
             ThrowError($"Expected operator {keyword}: {msg}");
     }
 
