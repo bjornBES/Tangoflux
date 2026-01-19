@@ -5,7 +5,11 @@ using System.Text.Json.Serialization;
 [JsonDerivedType(typeof(NodeStmtReturn), "NodeStmtReturn")]
 [JsonDerivedType(typeof(NodeStmtVarDecl), "NodeStmtVarDecl")]
 [JsonDerivedType(typeof(NodeStmtFuncDecl), "NodeFuncDecl")]
+[JsonDerivedType(typeof(NodeStmtIf), "NodeStmtIf")]
 [JsonDerivedType(typeof(NodeStmtScope), "NodeScope")]
+[JsonDerivedType(typeof(NodeStmtForLoop), "NodeStmtForLoop")]
+[JsonDerivedType(typeof(NodeStmtVarReassign), "NodeStmtVarReassign")]
+[JsonDerivedType(typeof(NodeStmtWhileLoop), "NodeStmtWhileLoop")]
 public interface IStmt
 {
 }

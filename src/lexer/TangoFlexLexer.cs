@@ -51,7 +51,7 @@ internal class TangoFlexLexer
         {
             string c = (Source[i] == '\n') ? "\\n" : Source[i].ToString();
             LexerConfig.Column++;
-            Console.WriteLine($"new char {c}");
+            // Console.WriteLine($"new char {c}");
             FSAs.ForEach(fsa => fsa.ReadChar(Source[i]));
 
             // if no running
@@ -78,7 +78,7 @@ internal class TangoFlexLexer
                         AddToken(token, ref tokens);
                         buffer_char = Source[i];
                         buffer_column = LexerConfig.Column;
-                        Console.WriteLine($"buffer column = {buffer_column} LexerConfig.Column = {LexerConfig.Column}");
+                        // Console.WriteLine($"buffer column = {buffer_column} LexerConfig.Column = {LexerConfig.Column}");
                     }
                     LexerConfig.Column--;
                     i--;

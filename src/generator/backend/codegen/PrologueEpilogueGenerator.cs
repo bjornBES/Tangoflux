@@ -14,6 +14,7 @@ public static class PrologueEpilogueGenerator
     {
         var lines = new List<string>();
         // nice label
+        lines.Add($"global {frame.FunctionName}:");
         lines.Add($"{frame.FunctionName}:");
 
         // choose per-profile callee-saved default order (push order). We will push only those the function uses.
@@ -121,10 +122,19 @@ public static class PrologueEpilogueGenerator
             lines.Add($"    pop {conv.GetRegisterName(fp)}");
         }
 
-        // return instruction (ABI dependent)
+        // exit instruction (ABI dependent)
         if (profile == RegisterProfile.X86_64_SysV || profile == RegisterProfile.X86_32_Cdecl)
         {
-            lines.Add($"    ret");
+            if (frame.FunctionName == "main")
+            {
+                lines.Add($"    mov rdi, rax");
+                lines.Add($"    mov rax, 60");
+                lines.Add($"    syscall");
+            }
+            else
+            {
+                lines.Add($"    ret");
+            }
         }
         else if (profile == RegisterProfile.ARM64_Linux)
         {

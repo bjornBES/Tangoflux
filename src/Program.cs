@@ -33,11 +33,12 @@ public class Program
         Arguments arguments = EasyArgs.Parse<Arguments>(args);
         string src = File.ReadAllText(arguments.InputFile);
 
-        TangoFlexLexer tangoFlexLexer = new TangoFlexLexer(src, arguments);
+        TangoFlexPreprocessor preprocessor = new TangoFlexPreprocessor(src, arguments);
+        TangoFlexLexer tangoFlexLexer = new TangoFlexLexer(preprocessor.SourceCode, arguments);
         TangoFlexParser tangoFlexParser = new TangoFlexParser(tangoFlexLexer.Tokens.ToArray(), arguments);
         TangoFlexIRParser tangoFlexIRParser = new TangoFlexIRParser(tangoFlexParser.AST, arguments);
-        // TangoFlexGenerator tangoFlexGenerator = new TangoFlexGenerator(tangoFlexParser.AST, arguments);
-        // File.WriteAllText(arguments.OutputFile, string.Join(Environment.NewLine, tangoFlexGenerator.Output));
+        TangoFlexGenerator tangoFlexGenerator = new TangoFlexGenerator(tangoFlexIRParser.Module, arguments);
+        File.WriteAllText(arguments.OutputFile, string.Join(Environment.NewLine, tangoFlexGenerator.Output));
 
         Console.WriteLine("Hello world");
     }

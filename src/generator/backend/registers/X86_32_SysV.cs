@@ -11,11 +11,11 @@ public class X86_32_SysV : ICallingConvention
         { RegisterFunction.ProgramPointer, new RegisterInfo("eip", 2) },
 
         { RegisterFunction.SyscallNumber, new RegisterInfo("eax", 3) },
-        { RegisterFunction.SyscallArg0,   new RegisterInfo("edi", 4) },
-        { RegisterFunction.SyscallArg1,   new RegisterInfo("esi", 5) },
-        { RegisterFunction.SyscallArg2,   new RegisterInfo("edx", 6) },
+        { RegisterFunction.Arg0,          new RegisterInfo("edi", 4) },
+        { RegisterFunction.Arg1,          new RegisterInfo("esi", 5) },
+        { RegisterFunction.Arg2,          new RegisterInfo("edx", 6) },
 
-        { RegisterFunction.SyscallReturn64, new RegisterInfo("eax", 3) },
+        { RegisterFunction.ReturnInt, new RegisterInfo("eax", 3) },
     };
 
     public RegisterInfo GetRegister(RegisterFunction f) => funcToReg[f];

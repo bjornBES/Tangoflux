@@ -3,10 +3,11 @@ using System.Text.Json.Serialization;
 
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "$type")]
 [JsonDerivedType(typeof(NodeTerm), "NodeTerm")]
-// [JsonDerivedType(typeof(NodeExprBinary), "NodeExprBinary")]
-// [JsonDerivedType(typeof(NodeExprUnary), "NodeExprUnary")]
-// [JsonDerivedType(typeof(NodeExprCall), "NodeExprCall")]
-// [JsonDerivedType(typeof(NodeExprAssign), "NodeExprAssign")]
+[JsonDerivedType(typeof(NodeExprBinary), "NodeExprBinary")]
+[JsonDerivedType(typeof(NodeExprUnary), "NodeExprUnary")]
+[JsonDerivedType(typeof(NodeExprCall), "NodeExprCall")]
+[JsonDerivedType(typeof(NodeExprAssign), "NodeExprAssign")]
+[JsonDerivedType(typeof(NodeExprArrayAccess), "NodeExprArrayAccess")]
 [JsonDerivedType(typeof(NodeExpr), "NodeExpr")]
 public interface IExpr
 {
