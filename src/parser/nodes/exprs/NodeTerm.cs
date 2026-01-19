@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "$type")]
 [JsonDerivedType(typeof(NodeTermIntlit), "NodeTermIntlit")]
 // [JsonDerivedType(typeof(NodeTermFloatlit), "NodeTermFloatlit")]
-// [JsonDerivedType(typeof(NodeTermStringlit), "NodeTermStringlit")]
+[JsonDerivedType(typeof(NodeTermStringlit), "NodeTermStringlit")]
 // [JsonDerivedType(typeof(NodeTermBoollit), "NodeTermBoollit")]
 [JsonDerivedType(typeof(NodeTermVar), "NodeTermVar")]
 public interface ITerm

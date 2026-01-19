@@ -26,7 +26,7 @@ public class ScratchRegisterAllocator
                 {
                     conv.GetRegister(RegisterFunction.Scratch) ?? new RegisterInfo("rax",3),
                     conv.GetRegister(RegisterFunction.Arg0) ?? new RegisterInfo("rdi",4),
-                    conv.GetRegister(RegisterFunction.Arg1) ?? new RegisterInfo("rsi",5),
+                    // conv.GetRegister(RegisterFunction.Arg1) ?? new RegisterInfo("rsi",5),
                     conv.GetRegister(RegisterFunction.Arg2) ?? new RegisterInfo("rdx",6),
                     conv.GetRegister(RegisterFunction.Arg3) ?? new RegisterInfo("r10",7),
                     conv.GetRegister(RegisterFunction.Arg4) ?? new RegisterInfo("r8",8),
@@ -48,6 +48,26 @@ public class ScratchRegisterAllocator
         }
 
         var r = freeRegs.Pop();
+        Console.WriteLine($"Allocating register: {r}");
+        inUse.Add(r.Register);
+        return r;
+    }
+    public RegOperand? AllocateTemp()
+    {
+        if (freeRegs.Count == 0)
+        {
+            Console.WriteLine("No scratch registers available!");
+            return null;
+        }
+        // 2 left to avoid exhausting all scratch regs
+        if (freeRegs.Count <= 2)
+        {
+            Console.WriteLine("Exceeded max scratch registers!");
+            return null;
+        }
+
+        RegOperand r = freeRegs.Pop();
+        Console.WriteLine($"Allocating temp register: {r}");
         inUse.Add(r.Register);
         return r;
     }
@@ -56,7 +76,7 @@ public class ScratchRegisterAllocator
     {
         if (!inUse.Remove(r.Register))
             throw new InvalidOperationException($"Register {r} not in use.");
-
+        Console.WriteLine($"Releasing register: {r}");
         freeRegs.Push(r);
     }
 

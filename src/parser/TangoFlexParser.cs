@@ -38,20 +38,108 @@ public class TangoFlexParser
                 TokenIdentifier tokenIdentifier = (TokenIdentifier)Advance();
                 nodeTerm.term = new NodeTermVar() { name = tokenIdentifier.Val };
                 break;
+            case TokenKind.STRING:
+                TokenString tokenString = (TokenString)Advance();
+                nodeTerm.term = new NodeTermStringlit() { value = tokenString.Val };
+                break;
         }
 
         return nodeTerm;
     }
 
-    NodeExpr parseExpr()
+    // from hydrogen-cpp
+    // https://github.com/orosmatthew/hydrogen-cpp/blob/master/src/parser.hpp
+    NodeExpr parseExpr(int min_prec = 0)
     {
-        NodeExpr expr = new NodeExpr();
-
+        NodeTerm? term_lhs = parseTerm();
+        if (term_lhs == null)
         {
-            expr.expr = parseTerm();
+            return null;
+        }
+        NodeExpr exprLhs = new NodeExpr() { expr = term_lhs };
+
+        while (true)
+        {
+            Token? currToken = Peek();
+            if (currToken == null || currToken.Kind != TokenKind.OPERATOR)
+            {
+                break;
+            }
+
+            TokenOperator op = (TokenOperator)currToken;
+            NodeExpr exprRhs;
+            if (op.IsCompound())
+            {
+                Advance();
+                exprRhs = parseExpr();
+
+                NodeExprBinary binaryOp = new NodeExprBinary()
+                {
+                    Lhs = exprLhs,
+                    Operator = new NodeOperator() { Val = op.FromAssign() },
+                    Rhs = exprRhs
+                };
+
+                exprLhs = new NodeExpr
+                {
+                    expr = binaryOp
+                };
+                return exprLhs;
+            }
+            if (op.Val == OperatorVal.LBRACKET)
+            {
+                Advance();
+                NodeExpr indexExpr = parseExpr();
+                ExpectOperator(OperatorVal.RBRACKET, "Expected ] after array index", out _);
+                return new NodeExpr()
+                {
+                    expr = new NodeExprArrayAccess()
+                    {
+                        array = exprLhs,
+                        index = indexExpr
+                    }
+                };
+            }
+
+            int? prec = ((TokenOperator)currToken).binPrec();
+            if (prec == null || prec < min_prec)
+            {
+                break;
+            }
+
+            // Expr is binary operator
+            Advance();
+            int nextMinPrec = prec.Value + 1;
+            exprRhs = parseExpr(nextMinPrec);
+            if (exprRhs == null)
+            {
+                ThrowError("Expected right hand side expression");
+            }
+
+            NodeExprBinary expr = new NodeExprBinary()
+            {
+                Lhs = exprLhs,
+                Operator = new NodeOperator() { Val = op.Val },
+                Rhs = exprRhs
+            };
+            exprLhs = new NodeExpr
+            {
+                expr = expr
+            };
         }
 
-        return expr;
+        return exprLhs;
+    }
+
+
+    NodeOperator parseOperator()
+    {
+        TokenOperator tokenOperator = Expect<TokenOperator>(TokenKind.OPERATOR, "Expected Operator");
+
+        NodeOperator nodeOperator = new NodeOperator();
+        nodeOperator.Val = tokenOperator.Val;
+
+        return nodeOperator;
     }
 
     NodeType parseType()
@@ -74,7 +162,7 @@ public class TangoFlexParser
             case KeywordVal.VOID:
             case KeywordVal.STRING:
                 break;
-            
+
             case KeywordVal.PTR:
                 ThrowError("Type cannot start with ptr");
                 break;
@@ -166,6 +254,164 @@ public class TangoFlexParser
         return nodeStmtVarDecl;
     }
 
+    NodeStmtIf parseStmtIf()
+    {
+        NodeStmtIf nodeStmtIf = new NodeStmtIf();
+        ExpectKeyword(KeywordVal.IF, "", out TokenKeyword _);
+        ExpectOperator(OperatorVal.LPAREN, "", out TokenOperator _);
+        NodeExpr condition = parseExpr();
+        ExpectOperator(OperatorVal.RPAREN, "", out TokenOperator _);
+        NodeStmtScope ifScope = parseScope();
+
+        nodeStmtIf.Condition = condition;
+        nodeStmtIf.Scope = ifScope;
+        NodeIfPred? pred = parseIfPred();
+        if (pred != null)
+        {
+            nodeStmtIf.Pred = pred;
+        }
+
+        return nodeStmtIf;
+    }
+
+    NodeIfPred? parseIfPred()
+    {
+        if (MatchKeyword(KeywordVal.ELSE, out TokenKeyword _))
+        {
+            if (MatchKeyword(KeywordVal.IF, out TokenKeyword _))
+            {
+                NodeIfPredElseIf elseIfPred = new NodeIfPredElseIf();
+                ExpectOperator(OperatorVal.LPAREN, "", out TokenOperator _);
+                NodeExpr elseIfCondition = parseExpr();
+                ExpectOperator(OperatorVal.RPAREN, "", out TokenOperator _);
+                NodeStmtScope elseIfScope = parseScope();
+
+                elseIfPred.Condition = elseIfCondition;
+                elseIfPred.Scope = elseIfScope;
+
+                NodeIfPred? elsePred = parseIfPred();
+                if (elsePred != null)
+                {
+                    elseIfPred.Pred = elsePred;
+                }
+
+                return elseIfPred;
+            }
+            else
+            {
+                NodeIfPredElse elsePred = new NodeIfPredElse();
+                NodeStmtScope elseScope = parseScope();
+
+                elsePred.Scope = elseScope;
+
+                return elsePred;
+            }
+        }
+
+        return null;
+    }
+
+    NodeStmtForLoop parseStmtForLoop()
+    {
+        NodeStmtForLoop stmtForLoop = new NodeStmtForLoop();
+        NodeType? type = null;
+
+        ExpectKeyword(KeywordVal.FOR, "Expected for loop", out _);
+        ExpectOperator(OperatorVal.LPAREN, "Expected ( after for", out _);
+        if (PeekKeyword().Val == KeywordVal.VAR)
+        {
+            ExpectKeyword(KeywordVal.VAR, "", out _);
+        }
+        Expect(TokenKind.IDENTIFIER, "", out TokenIdentifier varName);
+        if (PeekOperator().Val == OperatorVal.COLON)
+        {
+            ExpectOperator(OperatorVal.COLON, "", out TokenOperator _);
+            type = parseType();
+        }
+        ExpectOperator(OperatorVal.ASSIGN, "", out TokenOperator _);
+
+        NodeExpr startExpr = parseExpr();
+        ExpectOperator(OperatorVal.PERIOD, "Expected .. in for loop", out _);
+        ExpectOperator(OperatorVal.PERIOD, "Expected .. in for loop", out _);
+        NodeExpr endExpr = parseExpr();
+        // optional step
+        NodeExpr stepExpr;
+        if (MatchKeyword(KeywordVal.STEP, out _))
+        {
+            stepExpr = parseExpr();
+        }
+        else
+        {
+            stepExpr = new NodeExpr()
+            {
+                expr = new NodeTerm()
+                {
+                    term = new NodeTermIntlit()
+                    {
+                        value = 1
+                    }
+                }
+            };
+        }
+        ExpectOperator(OperatorVal.RPAREN, "Expected ) after for loop", out _);
+        NodeStmtScope scope = parseScope();
+
+        stmtForLoop.Name = varName.Val;
+        stmtForLoop.Type = type;
+        stmtForLoop.Start = startExpr;
+        stmtForLoop.End = endExpr;
+        stmtForLoop.Step = stepExpr;
+        stmtForLoop.Scope = scope;
+
+        return stmtForLoop;
+    }
+
+    private NodeStmtVarReassign parseStmtVarReassign()
+    {
+        // must be a var reassignment
+        NodeStmtVarReassign varReassign = new NodeStmtVarReassign();
+        string varName = "";
+        TokenOperator assign = (TokenOperator)Peek(1);
+
+        if (assign.IsCompound())
+        {
+            varReassign.Op = new NodeOperator() { Val = OperatorVal.ASSIGN };
+            if (Peek() != null && Peek().Kind == TokenKind.IDENTIFIER)
+            {
+                varName = ((TokenIdentifier)Peek()).Val;
+            }
+        }
+        else
+        {
+            Expect(TokenKind.IDENTIFIER, "Expected identifier for var reassignment", out TokenIdentifier varIdent);
+            varName = varIdent.Val;
+            ExpectOperator(OperatorVal.ASSIGN, "Expected = for var reassignment", out TokenOperator tokenOperator);
+            varReassign.Op = new NodeOperator() { Val = tokenOperator.Val };
+        }
+
+        NodeExpr expr = parseExpr();
+
+
+        varReassign.Name = varName;
+        varReassign.Expr = expr;
+        return varReassign;
+    }
+
+    NodeStmtWhileLoop parseStmtWhileLoop()
+    {
+        NodeStmtWhileLoop stmtWhileLoop = new NodeStmtWhileLoop();
+        ExpectKeyword(KeywordVal.WHILE, "Expected while loop", out _);
+        ExpectOperator(OperatorVal.LPAREN, "Expected ( after while", out _);
+        NodeExpr condition = parseExpr();
+        ExpectOperator(OperatorVal.RPAREN, "Expected ) after while condition", out _);
+        NodeStmtScope scope = parseScope();
+
+        stmtWhileLoop.Condition = condition;
+        stmtWhileLoop.Scope = scope;
+
+        return stmtWhileLoop;
+    }
+
     NodeStmtScope parseScope()
     {
         NodeStmtScope stmtScope = new NodeStmtScope();
@@ -208,6 +454,18 @@ public class TangoFlexParser
             {
                 stmt.stmt = parseStmtVarDecl();
             }
+            else if (keyword.Val == KeywordVal.IF)
+            {
+                stmt.stmt = parseStmtIf();
+            }
+            else if (keyword.Val == KeywordVal.FOR)
+            {
+                stmt.stmt = parseStmtForLoop();
+            }
+            else if (keyword.Val == KeywordVal.WHILE)
+            {
+                stmt.stmt = parseStmtWhileLoop();
+            }
             else
             {
                 Console.WriteLine($"Keyword dose not have a case {keyword}");
@@ -222,6 +480,10 @@ public class TangoFlexParser
                 stmt.stmt = parseScope();
             }
         }
+        else if (Peek().Kind == TokenKind.IDENTIFIER)
+        {
+            stmt.stmt = parseStmtVarReassign();
+        }
 
         return stmt;
     }
@@ -233,6 +495,8 @@ public class TangoFlexParser
         JsonSerializerOptions serializerOptions = new JsonSerializerOptions()
         {
             WriteIndented = true,
+            MaxDepth = 64,
+            ReferenceHandler = ReferenceHandler.IgnoreCycles
         };
         serializerOptions.Converters.Add(new JsonStringEnumConverter());
 
@@ -379,6 +643,13 @@ public class TangoFlexParser
         Token token = Peek();
         if (token != null && token.Kind == TokenKind.KEYWORD)
             return (TokenKeyword)token;
+        return null;
+    }
+    TokenOperator PeekOperator()
+    {
+        Token token = Peek();
+        if (token != null && token.Kind == TokenKind.OPERATOR)
+            return (TokenOperator)token;
         return null;
     }
 }

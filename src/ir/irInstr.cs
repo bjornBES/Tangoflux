@@ -10,6 +10,7 @@ public class IrType
     public static IrType Void = new IrType(KeywordVal.VOID);
     public static IrType Boolean = new IrType(KeywordVal.BOOL);
     public static IrType Int = new IrType(KeywordVal.INT);
+    public static IrType String = new IrType(KeywordVal.STRING);
 
     public int SizeInBits { get; set; }
     public bool IsSigned { get; set; }
@@ -213,6 +214,13 @@ public class IrSymbol : IrOperand
     public override string Dump() => $"@{Name}";
 }
 
+public class IrLabel : IrOperand
+{
+    public string Name { get; }
+    public IrLabel(string name) { Name = name; }
+    public override string Dump() => $"{Name}";
+}
+
 public class IrInstr
 {
     /// <summary>
@@ -262,6 +270,7 @@ public class IrFunction
     public List<IrBlock> Blocks { get; set; } = new List<IrBlock>();
     public List<IrLocal> Parameters { get; set; } = new List<IrLocal>();
     public int tempCounter = 0;
+    public int blockCounter = 0;
 
     public IrFunction(string name, IrType retType)
     {
@@ -283,7 +292,7 @@ public class IrFunction
     }
     public IrBlock NewBlock(string label)
     {
-        var b = new IrBlock(label);
+        var b = new IrBlock(label + $"{blockCounter++}");
         Blocks.Add(b);
         return b;
     }

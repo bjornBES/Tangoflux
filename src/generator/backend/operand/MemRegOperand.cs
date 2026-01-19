@@ -1,10 +1,10 @@
-public sealed class MemOperand : AsmOperand
+public sealed class MemRegOperand : AsmOperand
 {
     public RegisterInfo Base;
-    public int Offset;
+    public RegisterInfo Offset;
     public int Size;
 
-    public MemOperand(RegisterInfo baseReg, int size, int offset = 0)
+    public MemRegOperand(RegisterInfo baseReg, int size, RegisterInfo offset)
     {
         Base = baseReg;
         Offset = offset;
@@ -23,16 +23,26 @@ public sealed class MemOperand : AsmOperand
 
     public string ToStringWithoutPrefix()
     {
-        if (Offset == 0)
+        if (Offset == null)
+        {
             return $"[{Base.Name}]";
-        return $"[{Base.Name}{(Offset > 0 ? "+" : "")}{Offset}]";
+        }
+        else
+        {
+            return $"[{Base.Name}+{Offset}]";
+        }
     }
 
     public override string ToString()
     {
-        if (Offset == 0)
+        if (Offset == null)
+        {
             return $"{SizePrefix()} [{Base.Name}]";
-        return $"{SizePrefix()} [{Base.Name}{(Offset > 0 ? "+" : "")}{Offset}]";
+        }
+        else
+        {
+            return $"{SizePrefix()} [{Base.Name}+{Offset}]";
+        }
     }
 
     string SizePrefix()

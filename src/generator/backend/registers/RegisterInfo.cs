@@ -1,7 +1,7 @@
 public class RegisterInfo
 {
     public readonly string Name;
-    public readonly int Index;
+    public int Index { get; set; }
 
     public RegisterInfo(string name, int index)
     {

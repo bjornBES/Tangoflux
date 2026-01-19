@@ -32,4 +32,16 @@ public enum RegisterFunction
     Arg3,
     Arg4,
     Arg5,
+
+
+    // Fuck you x86
+    MultiplyResultLow,
+    MultiplyResultHigh,
+    MultiplySource1,
+
+    DivideDividendLow,
+    DivideDividendHigh,
+
+    DivideQuotient,
+    DivideRemainder,
 }

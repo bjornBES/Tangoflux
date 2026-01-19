@@ -114,6 +114,88 @@ namespace CompilerTangoFlex.lexer {
         public override string ToString() {
             return $"({Line}:{Column}): " + Kind + " [" + Val + "]: " + Operators.First(pair => pair.Value == Val).Key;
         }
+
+        public int binPrec()
+        {
+            switch (Val)
+            {
+                case OperatorVal.MULT:
+                case OperatorVal.DIV:
+                case OperatorVal.MOD:
+                    return 7;
+                case OperatorVal.ADD:
+                case OperatorVal.SUB:
+                    return 6;
+                case OperatorVal.LT:
+                case OperatorVal.LEQ:
+                case OperatorVal.GT:
+                case OperatorVal.GEQ:
+                    return 5;
+                case OperatorVal.EQ:
+                case OperatorVal.NEQ:
+                    return 4;
+                case OperatorVal.BITAND:
+                    return 3;
+                case OperatorVal.XOR:
+                    return 2;
+                case OperatorVal.BITOR:
+                    return 1;
+                case OperatorVal.AND:
+                    return 0;
+                case OperatorVal.OR:
+                    return -1;
+                default:
+                    return -2;
+            }
+        }
+        public bool IsCompound()
+        {
+            switch (Val)
+            {
+                case OperatorVal.ADDASSIGN:
+                case OperatorVal.SUBASSIGN:
+                case OperatorVal.MULTASSIGN:
+                case OperatorVal.DIVASSIGN:
+                case OperatorVal.MODASSIGN:
+                case OperatorVal.ANDASSIGN:
+                case OperatorVal.ORASSIGN:
+                case OperatorVal.XORASSIGN:
+                case OperatorVal.LSHIFTASSIGN:
+                case OperatorVal.RSHIFTASSIGN:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        internal OperatorVal FromAssign()
+        {
+            switch (Val)
+            {
+                case OperatorVal.ADDASSIGN:
+                    return OperatorVal.ADD;
+                case OperatorVal.SUBASSIGN:
+                    return OperatorVal.SUB;
+                case OperatorVal.MULTASSIGN:
+                    return OperatorVal.MULT;
+                case OperatorVal.DIVASSIGN:
+                    return OperatorVal.DIV;
+                case OperatorVal.MODASSIGN:
+                    return OperatorVal.MOD;
+                case OperatorVal.ANDASSIGN:
+                    return OperatorVal.BITAND;
+                case OperatorVal.ORASSIGN:
+                    return OperatorVal.BITOR;
+                case OperatorVal.XORASSIGN:
+                    return OperatorVal.XOR;
+                case OperatorVal.LSHIFTASSIGN:
+                    return OperatorVal.LSHIFT;
+                case OperatorVal.RSHIFTASSIGN:
+                    return OperatorVal.RSHIFT;
+                default:
+                    throw new Exception("Not a compound assignment operator");
+            }
+        }
     }
 
     public class FSAOperator : FSA {

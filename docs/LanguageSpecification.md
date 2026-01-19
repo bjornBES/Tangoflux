@@ -317,6 +317,8 @@ print("hello")
 
 ## 10. Casting
 
+> This is subject to change
+
 Explicit casts only.
 
 ### Syntax

@@ -9,6 +9,16 @@ public sealed class LableOperand : AsmOperand
         Offset = offset;
     }
 
+    public override string GetByteRepresentation()
+    {
+        return ToString();
+    }
+
+    public override string GetLongRepresentation()
+    {
+        return ToString();
+    }
+
     public override string ToString()
     {
         if (Offset == 0)
