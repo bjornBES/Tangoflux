@@ -29,6 +29,7 @@ internal class TangoFlexLexer
         Arguments = arguments;
         FSAs =
         [
+            new FSAPreprocessor(),
             new FSAFloat(),
             new FSAInt(),
             new FSAOperator(),
@@ -68,6 +69,7 @@ internal class TangoFlexLexer
                     }
                     if (token.Kind == TokenKind.NEWLINE)
                     {
+                        AddToken(token, ref tokens);
                     }
                     else if (token.Kind != TokenKind.NONE)
                     {
@@ -86,7 +88,7 @@ internal class TangoFlexLexer
                 }
                 else
                 {
-                    Console.WriteLine("error");
+                    Console.WriteLine($"error idx = {idx}");
                 }
             }
         }
@@ -104,7 +106,7 @@ internal class TangoFlexLexer
         }
         else
         {
-            Console.WriteLine("error");
+            Console.WriteLine($"error idx2 = {idx2}");
         }
 
         AddToken(new EmptyToken(), ref tokens);
@@ -114,10 +116,10 @@ internal class TangoFlexLexer
 
     public void AddToken(Token token, ref List<Token> tokens)
     {
-        if (token.Kind == TokenKind.NEWLINE)
-        {
-            return;
-        }
+        // if (token.Kind == TokenKind.NEWLINE)
+        // {
+        //     return;
+        // }
         token.Line = LexerConfig.Line;
         token.Column = buffer_column;
         tokens.Add(token);

@@ -11,12 +11,14 @@ namespace CompilerTangoFlex.lexer {
         KEYWORD,
         OPERATOR,
         NEWLINE,
+        PREPROCESSOR,
     }
 
     public abstract class Token {
         public override string ToString() {
             return Kind.ToString();
         }
+        public abstract Token Clone();
         public abstract TokenKind Kind { get; }
         public int Line { get; set; }
         public int Column { get; set; }
@@ -24,11 +26,19 @@ namespace CompilerTangoFlex.lexer {
 
     public sealed class EmptyToken : Token {
         public override TokenKind Kind { get; } = TokenKind.NONE;
+        public override Token Clone()
+        {
+            return new EmptyToken();
+        }
     }
 
     public sealed class NewlineToken : Token
     {
         public override TokenKind Kind { get;} = TokenKind.NEWLINE;
+        public override Token Clone()
+        {
+            return new NewlineToken();
+        }
     }
 
     public sealed class FSASpace : FSA {
@@ -133,7 +143,7 @@ namespace CompilerTangoFlex.lexer {
         }
 
         public override Token RetrieveToken() {
-            return new EmptyToken();
+            return new NewlineToken();
         }
 
         public override void ReadChar(char ch)

@@ -18,7 +18,11 @@ namespace CompilerTangoFlex.lexer {
         public string Val { get; }
 
         public override string ToString() =>
-            $"({Line}:{Column}): " + $"{Kind}: \"{Raw}\"\n\"{Val}\"";
+            $"({Line}:{Column}): " + $"{Kind}: \"{Raw}\" \"{Val}\"";
+        public override Token Clone()
+        {
+            return new TokenString(Val, Raw);
+        }
     }
 
     public sealed class FSAString : FSA {

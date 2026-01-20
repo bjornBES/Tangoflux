@@ -37,6 +37,10 @@ namespace CompilerTangoFlex.lexer {
             }
             return str + ": " + Val + " \"" + Raw + "\"";
         }
+        public override Token Clone()
+        {
+            return new TokenInt(Val, Suffix, Raw);
+        }
 
         public readonly long Val;
         public readonly string Raw;

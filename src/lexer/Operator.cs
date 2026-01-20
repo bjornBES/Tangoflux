@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 
-namespace CompilerTangoFlex.lexer {
+namespace CompilerTangoFlex.lexer
+{
     /// <summary>
     /// Note that '...' is recognized as three '.'s
     /// </summary>
-    public enum OperatorVal {
+    public enum OperatorVal
+    {
         LBRACKET,
         RBRACKET,
         LPAREN,
@@ -52,11 +54,15 @@ namespace CompilerTangoFlex.lexer {
         XORASSIGN,
         SEMICOLON,
         LCURL,
-        RCURL
+        RCURL,
+        HASH,
+        INTRINSICS
     }
 
-    public sealed class TokenOperator : Token {
-        public TokenOperator(OperatorVal val) {
+    public sealed class TokenOperator : Token
+    {
+        public TokenOperator(OperatorVal val)
+        {
             Val = val;
         }
 
@@ -108,11 +114,20 @@ namespace CompilerTangoFlex.lexer {
             { "^=",   OperatorVal.XORASSIGN    },
             { ";",    OperatorVal.SEMICOLON    },
             { "{",    OperatorVal.LCURL        },
-            { "}",    OperatorVal.RCURL        }
+            { "}",    OperatorVal.RCURL        },
+            { "AS",   OperatorVal.ASSIGN       },
+            { "#",    OperatorVal.HASH         },
+            { "@",    OperatorVal.INTRINSICS   },
         };
 
-        public override string ToString() {
+        public override string ToString()
+        {
             return $"({Line}:{Column}): " + Kind + " [" + Val + "]: " + Operators.First(pair => pair.Value == Val).Key;
+        }
+
+        public override Token Clone()
+        {
+            return new TokenOperator(Val);
         }
 
         public int binPrec()
@@ -196,10 +211,24 @@ namespace CompilerTangoFlex.lexer {
                     throw new Exception("Not a compound assignment operator");
             }
         }
+
+        internal bool IsUnary()
+        {
+            switch (Val)
+            {
+                case OperatorVal.ADD:
+                case OperatorVal.SUB:
+                case OperatorVal.BITAND:
+                    return true;
+            }
+            return false;
+        }
     }
 
-    public class FSAOperator : FSA {
-        private enum State {
+    public class FSAOperator : FSA
+    {
+        private enum State
+        {
             START,
             END,
             ERROR,
@@ -244,24 +273,30 @@ namespace CompilerTangoFlex.lexer {
             '|',
             ';',
             '{',
-            '}'
+            '}',
+            '#',
+            '@'
             );
 
         private State _state;
         private string _scanned;
 
-        public FSAOperator() {
+        public FSAOperator()
+        {
             _state = State.START;
             _scanned = "";
         }
 
-        public override sealed void Reset() {
+        public override sealed void Reset()
+        {
             _state = State.START;
             _scanned = "";
         }
 
-        public override sealed FSAStatus GetStatus() {
-            switch (_state) {
+        public override sealed FSAStatus GetStatus()
+        {
+            switch (_state)
+            {
                 case State.START:
                     return FSAStatus.NONE;
                 case State.END:
@@ -273,20 +308,25 @@ namespace CompilerTangoFlex.lexer {
             }
         }
 
-        public override sealed Token RetrieveToken() {
+        public override sealed Token RetrieveToken()
+        {
             return new TokenOperator(TokenOperator.Operators[_scanned.Substring(0, _scanned.Length - 1)]);
         }
 
-        public override sealed void ReadChar(char ch) {
+        public override sealed void ReadChar(char ch)
+        {
             _scanned = _scanned + ch;
-            switch (_state) {
+            switch (_state)
+            {
                 case State.END:
                 case State.ERROR:
                     _state = State.ERROR;
                     break;
                 case State.START:
-                    if (OperatorChars.Contains(ch)) {
-                        switch (ch) {
+                    if (OperatorChars.Contains(ch))
+                    {
+                        switch (ch)
+                        {
                             case '-':
                                 _state = State.SUB;
                                 break;
@@ -327,7 +367,9 @@ namespace CompilerTangoFlex.lexer {
                                 _state = State.FINISH;
                                 break;
                         }
-                    } else {
+                    }
+                    else
+                    {
                         _state = State.ERROR;
                     }
                     break;
@@ -335,7 +377,8 @@ namespace CompilerTangoFlex.lexer {
                     _state = State.END;
                     break;
                 case State.SUB:
-                    switch (ch) {
+                    switch (ch)
+                    {
                         case '>':
                         case '-':
                         case '=':
@@ -347,7 +390,8 @@ namespace CompilerTangoFlex.lexer {
                     }
                     break;
                 case State.ADD:
-                    switch (ch) {
+                    switch (ch)
+                    {
                         case '+':
                         case '=':
                             _state = State.FINISH;
@@ -358,7 +402,8 @@ namespace CompilerTangoFlex.lexer {
                     }
                     break;
                 case State.AMP:
-                    switch (ch) {
+                    switch (ch)
+                    {
                         case '&':
                         case '=':
                             _state = State.FINISH;
@@ -369,14 +414,18 @@ namespace CompilerTangoFlex.lexer {
                     }
                     break;
                 case State.MULT:
-                    if (ch == '=') {
+                    if (ch == '=')
+                    {
                         _state = State.FINISH;
-                    } else {
+                    }
+                    else
+                    {
                         _state = State.END;
                     }
                     break;
                 case State.LT:
-                    switch (ch) {
+                    switch (ch)
+                    {
                         case '=':
                             _state = State.FINISH;
                             break;
@@ -389,7 +438,8 @@ namespace CompilerTangoFlex.lexer {
                     }
                     break;
                 case State.GT:
-                    switch (ch) {
+                    switch (ch)
+                    {
                         case '=':
                             _state = State.FINISH;
                             break;
@@ -402,14 +452,18 @@ namespace CompilerTangoFlex.lexer {
                     }
                     break;
                 case State.EQ:
-                    if (ch == '=') {
+                    if (ch == '=')
+                    {
                         _state = State.FINISH;
-                    } else {
+                    }
+                    else
+                    {
                         _state = State.END;
                     }
                     break;
                 case State.OR:
-                    switch (ch) {
+                    switch (ch)
+                    {
                         case '|':
                         case '=':
                             _state = State.FINISH;
@@ -420,44 +474,62 @@ namespace CompilerTangoFlex.lexer {
                     }
                     break;
                 case State.NOT:
-                    if (ch == '=') {
+                    if (ch == '=')
+                    {
                         _state = State.FINISH;
-                    } else {
+                    }
+                    else
+                    {
                         _state = State.END;
                     }
                     break;
                 case State.DIV:
-                    if (ch == '=') {
+                    if (ch == '=')
+                    {
                         _state = State.FINISH;
-                    } else {
+                    }
+                    else
+                    {
                         _state = State.END;
                     }
                     break;
                 case State.MOD:
-                    if (ch == '=') {
+                    if (ch == '=')
+                    {
                         _state = State.FINISH;
-                    } else {
+                    }
+                    else
+                    {
                         _state = State.END;
                     }
                     break;
                 case State.XOR:
-                    if (ch == '=') {
+                    if (ch == '=')
+                    {
                         _state = State.FINISH;
-                    } else {
+                    }
+                    else
+                    {
                         _state = State.END;
                     }
                     break;
                 case State.LTLT:
-                    if (ch == '=') {
+                    if (ch == '=')
+                    {
                         _state = State.FINISH;
-                    } else {
+                    }
+                    else
+                    {
                         _state = State.END;
                     }
                     break;
                 case State.GTGT:
-                    if (ch == '=') {
+                    if (ch == '=')
+                    {
                         _state = State.FINISH;
-                    } else {
+                    }
+                    else
+                    {
                         _state = State.END;
                     }
                     break;
@@ -467,9 +539,11 @@ namespace CompilerTangoFlex.lexer {
             }
         }
 
-        public override sealed void ReadEOF() {
+        public override sealed void ReadEOF()
+        {
             _scanned = _scanned + '0';
-            switch (_state) {
+            switch (_state)
+            {
                 case State.FINISH:
                 case State.SUB:
                 case State.ADD:

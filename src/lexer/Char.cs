@@ -14,6 +14,10 @@ namespace CompilerTangoFlex.lexer {
         public string Raw { get; }
         public char Value { get; }
         public override string ToString() => $"({Line}:{Column}): " + $"{Kind}: '{Raw}'";
+        public override Token Clone()
+        {
+            return new TokenCharConst(Raw, Value);
+        }
     }
 
     /// <summary>

@@ -14,14 +14,14 @@ namespace CompilerTangoFlex.lexer {
         }
 
         public TokenFloat(double value, FloatSuffix suffix, string source) {
-            Value = value;
+            Val = value;
             Suffix = suffix;
-            Source = source;
+            Raw = source;
         }
 
         public override TokenKind Kind { get; } = TokenKind.FLOAT;
-        public double Value { get; }
-        public string Source { get; }
+        public double Val { get; }
+        public string Raw { get; }
         public FloatSuffix Suffix { get; }
 
         public override string ToString() {
@@ -37,7 +37,11 @@ namespace CompilerTangoFlex.lexer {
                     str += "(double)";
                     break;
             }
-            return str + ": " + Value + " \"" + Source + "\"";
+            return str + ": " + Val + " \"" + Raw + "\"";
+        }
+        public override Token Clone()
+        {
+            return new TokenFloat(Val, Suffix, Raw);
         }
     }
 

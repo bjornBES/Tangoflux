@@ -1,30 +1,55 @@
-﻿using System;
+using System;
+using System.Collections.Generic;
 
 namespace CompilerTangoFlex.lexer
 {
-    /// <summary>
-    /// If the identifier is found to be a keyword, then it will be a keyword
-    /// </summary>
-    public sealed class TokenIdentifier : Token
+    public enum PreprocessorVal
     {
-        public TokenIdentifier(string val)
+        NONE = 0,
+        // preprocessor
+        PREDEFINE,
+        PREUNDEF,
+        PREENDIF,
+        PREIF,
+        PREIFDEF,
+        PREIFNDEF,
+        PREELSE,
+        PREELIF,
+    }
+
+    public class TokenPreprocessor : Token
+    {
+        public TokenPreprocessor(PreprocessorVal val)
         {
             Val = val;
         }
 
-        public override TokenKind Kind { get; } = TokenKind.IDENTIFIER;
-        public string Val { get; }
+        public override TokenKind Kind { get; } = TokenKind.PREPROCESSOR;
+        public PreprocessorVal Val { get; }
+        public static Dictionary<string, PreprocessorVal> PreprocessorKeywords { get; } = new Dictionary<string, PreprocessorVal>(StringComparer.InvariantCultureIgnoreCase) {
+
+            { "#IF",        PreprocessorVal.PREIF        },
+            { "#ELIF",      PreprocessorVal.PREELIF      },
+            { "#ELSE",      PreprocessorVal.PREELSE      },
+            { "#IFDEF",     PreprocessorVal.PREIFDEF     },
+            { "#IFNDEF",    PreprocessorVal.PREIFNDEF    },
+            { "#DEFINE",    PreprocessorVal.PREDEFINE    },
+            { "#UNDEF",     PreprocessorVal.PREUNDEF     },
+            { "#ENDIF",     PreprocessorVal.PREENDIF     },
+        };
+
         public override string ToString()
         {
             return $"({Line}:{Column}): " + Kind + ": " + Val;
         }
+
         public override Token Clone()
         {
-            return new TokenIdentifier(Val);
+            return new TokenPreprocessor(Val);
         }
     }
 
-    public sealed class FSAIdentifier : FSA
+    public sealed class FSAPreprocessor : FSA
     {
         private enum State
         {
@@ -36,7 +61,7 @@ namespace CompilerTangoFlex.lexer
         private State _state;
         private string _scanned;
 
-        public FSAIdentifier()
+        public FSAPreprocessor()
         {
             _state = State.START;
             _scanned = "";
@@ -68,11 +93,11 @@ namespace CompilerTangoFlex.lexer
         public override Token RetrieveToken()
         {
             string name = _scanned.Substring(0, _scanned.Length - 1);
-            if (TokenKeyword.Keywords.ContainsKey(name))
+            if (TokenPreprocessor.PreprocessorKeywords.ContainsKey(name))
             {
-                return new TokenKeyword(TokenKeyword.Keywords[name]);
+                return new TokenPreprocessor(TokenPreprocessor.PreprocessorKeywords[name]);
             }
-            return new TokenIdentifier(name);
+            return new EmptyToken();
         }
 
         public override void ReadChar(char ch)
@@ -85,7 +110,7 @@ namespace CompilerTangoFlex.lexer
                     _state = State.ERROR;
                     break;
                 case State.START:
-                    if (ch == '_' || char.IsLetter(ch))
+                    if (ch == '#')
                     {
                         _state = State.ID;
                     }

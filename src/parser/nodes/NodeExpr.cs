@@ -8,6 +8,9 @@ using System.Text.Json.Serialization;
 [JsonDerivedType(typeof(NodeExprCall), "NodeExprCall")]
 [JsonDerivedType(typeof(NodeExprAssign), "NodeExprAssign")]
 [JsonDerivedType(typeof(NodeExprArrayAccess), "NodeExprArrayAccess")]
+[JsonDerivedType(typeof(NodeExprFieldAccess), "NodeExprFieldAccess")]
+[JsonDerivedType(typeof(NodeExprAddressOf), "NodeExprAddressOf")]
+[JsonDerivedType(typeof(NodeExprCast), "NodeExprCast")]
 [JsonDerivedType(typeof(NodeExpr), "NodeExpr")]
 public interface IExpr
 {

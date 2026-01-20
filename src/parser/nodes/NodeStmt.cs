@@ -10,6 +10,8 @@ using System.Text.Json.Serialization;
 [JsonDerivedType(typeof(NodeStmtForLoop), "NodeStmtForLoop")]
 [JsonDerivedType(typeof(NodeStmtVarReassign), "NodeStmtVarReassign")]
 [JsonDerivedType(typeof(NodeStmtWhileLoop), "NodeStmtWhileLoop")]
+[JsonDerivedType(typeof(NodeStmtCallFunction), "NodeStmtCallFunction")]
+[JsonDerivedType(typeof(NodeStmtExternal), "NodeStmtExternal")]
 public interface IStmt
 {
 }

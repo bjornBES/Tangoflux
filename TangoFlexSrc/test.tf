@@ -1,7 +1,14 @@
-func main(argv : uint8 ptr ptr, argc : int32):int {
+#extension io
+
+#define Hello_World as 0
+
+func main(argv : uint8 ptr ptr, argc : int32):int
+{
+    #if Hello_World == 0
     {
         var framebuffer : uint8 ptr = 0xb8000
     }
+    #endif
     var test : int = 0
     if (test == 0)
     {

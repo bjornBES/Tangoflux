@@ -11,11 +11,24 @@
             "preLaunchTask": "build",
             "program": "${workspaceFolder}/bin/Debug/net9.0/Tangoflux",
             "args": [
-                "-i", "./TangoFlexSrc/test.tf",
+                "./TangoFlexSrc/test.tf",
                 "-o", "./outputs/test1.asm",
                 "--cc", "SysV",
                 "--backend", "asm",
                 "--bits", "64"
+            ],
+            "cwd": "${workspaceFolder}",
+            "stopAtEntry": false,
+            "console": "internalConsole",
+        },
+        {
+            "name": "-h",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/bin/Debug/net9.0/Tangoflux",
+            "args": [
+                "-h"
             ],
             "cwd": "${workspaceFolder}",
             "stopAtEntry": false,

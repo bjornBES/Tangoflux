@@ -1,3 +1,7 @@
+#define Test as 1
+#undef Test
+
+#ifdef Test
 func main(argv : uint8 ptr ptr, argc : uint8) : int
 {
     var test : int = 0
@@ -5,3 +9,14 @@ func main(argv : uint8 ptr ptr, argc : uint8) : int
     {
     }
 }
+#elif !Test
+func case2() : void
+{
+
+}
+#else
+func new_main() : void
+{
+
+}
+#endif

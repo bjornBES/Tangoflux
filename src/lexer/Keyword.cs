@@ -1,12 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace CompilerTangoFlex.lexer {
-    public enum KeywordVal {
+namespace CompilerTangoFlex.lexer
+{
+    public enum KeywordVal
+    {
         NONE = 0,
         FUNC, VAR, RETURN,
         IF, ELSE, WHILE,
         FOR, STEP,
+        CALL,
         TRUE, FALSE,
         INT8, UINT8,
         INT16, UINT16,
@@ -14,68 +17,85 @@ namespace CompilerTangoFlex.lexer {
         INT64, UINT64,
         FLOAT, BOOL, STRING, VOID,
         PTR,
-        
-/*
-        AUTO,
-        DOUBLE,
-        STRUCT,
-        BREAK,
-        LONG,
-        SWITCH,
-        CASE,
-        ENUM,
-        REGISTER,
-        TYPEDEF,
-        CHAR,
-        EXTERN,
-        UNION,
-        CONST,
-        SHORT,
-        UNSIGNED,
-        CONTINUE,
-        FOR,
-        SIGNED,
-        VOID,
-        DEFAULT,
-        GOTO,
-        SIZEOF,
-        VOLATILE,
-        DO,
-        STATIC,
- */
+
+        AS,
+
+        EXTERNAL,
+        PUBLIC,
+        INTERNAL,
+        PRIVATE,
+        /*
+                AUTO,
+                DOUBLE,
+                STRUCT,
+                BREAK,
+                LONG,
+                SWITCH,
+                CASE,
+                ENUM,
+                REGISTER,
+                TYPEDEF,
+                CHAR,
+                EXTERN,
+                UNION,
+                CONST,
+                SHORT,
+                UNSIGNED,
+                CONTINUE,
+                FOR,
+                SIGNED,
+                VOID,
+                DEFAULT,
+                GOTO,
+                SIZEOF,
+                VOLATILE,
+                DO,
+                STATIC,
+         */
     }
 
-    public class TokenKeyword : Token {
-        public TokenKeyword(KeywordVal val) {
+    public class TokenKeyword : Token
+    {
+        public TokenKeyword(KeywordVal val)
+        {
             Val = val;
         }
 
         public override TokenKind Kind { get; } = TokenKind.KEYWORD;
         public KeywordVal Val { get; }
         public static Dictionary<string, KeywordVal> Keywords { get; } = new Dictionary<string, KeywordVal>(StringComparer.InvariantCultureIgnoreCase) {
-            { "INT",        KeywordVal.INT      },
-            { "ELSE",       KeywordVal.ELSE     },
-            { "RETURN",     KeywordVal.RETURN   },
-            { "FLOAT",      KeywordVal.FLOAT    },
-            { "IF",         KeywordVal.IF       },
-            { "WHILE",      KeywordVal.WHILE    },
-            { "FUNC",       KeywordVal.FUNC     },
-            { "VAR",        KeywordVal.VAR      },
-            { "FOR",        KeywordVal.FOR      },
-            { "STEP",       KeywordVal.STEP     },
-            { "TRUE",       KeywordVal.TRUE     },
-            { "FALSE",      KeywordVal.FALSE    },
-            { "STRING",     KeywordVal.STRING   },
-            { "BOOL",       KeywordVal.BOOL     },
-            { "PTR",        KeywordVal.PTR      },
-            { "INT8",       KeywordVal.INT8     },
-            { "UINT8",      KeywordVal.UINT8    },
-            { "INT16",      KeywordVal.INT16    },
-            { "UINT16",     KeywordVal.UINT16   },
-            { "INT32",      KeywordVal.INT32    },
-            { "UINT32",     KeywordVal.UINT32   },
-            { "INT64",      KeywordVal.INT64    },
-            { "UINT64",     KeywordVal.UINT64   },
+            { "INT",        KeywordVal.INT          },
+            { "ELSE",       KeywordVal.ELSE         },
+            { "RETURN",     KeywordVal.RETURN       },
+            { "FLOAT",      KeywordVal.FLOAT        },
+            { "IF",         KeywordVal.IF           },
+            { "WHILE",      KeywordVal.WHILE        },
+            { "FUNC",       KeywordVal.FUNC         },
+            { "VAR",        KeywordVal.VAR          },
+            { "FOR",        KeywordVal.FOR          },
+            { "STEP",       KeywordVal.STEP         },
+            { "CALL",       KeywordVal.CALL         },
+            { "TRUE",       KeywordVal.TRUE         },
+            { "FALSE",      KeywordVal.FALSE        },
+            { "STRING",     KeywordVal.STRING       },
+            { "BOOL",       KeywordVal.BOOL         },
+            { "PTR",        KeywordVal.PTR          },
+            { "INT8",       KeywordVal.INT8         },
+            { "UINT8",      KeywordVal.UINT8        },
+            { "INT16",      KeywordVal.INT16        },
+            { "UINT16",     KeywordVal.UINT16       },
+            { "INT32",      KeywordVal.INT32        },
+            { "UINT32",     KeywordVal.UINT32       },
+            { "INT64",      KeywordVal.INT64        },
+            { "UINT64",     KeywordVal.UINT64       },
+            { "VOID",       KeywordVal.VOID         },
+
+            { "AS",         KeywordVal.AS           },
+
+            { "EXTERNAL",   KeywordVal.EXTERNAL     },
+            { "PUBLIC",     KeywordVal.PUBLIC       },
+            { "INTERNAL",   KeywordVal.INTERNAL     },
+            { "PRIVATE",    KeywordVal.PRIVATE      },
             /*
             { "AUTO",        KeywordVal.AUTO      },
             { "DOUBLE",      KeywordVal.DOUBLE    },
@@ -96,7 +116,6 @@ namespace CompilerTangoFlex.lexer {
             { "CONTINUE",    KeywordVal.CONTINUE  },
             { "FOR",         KeywordVal.FOR       },
             { "SIGNED",      KeywordVal.SIGNED    },
-            { "VOID",        KeywordVal.VOID      },
             { "DEFAULT",     KeywordVal.DEFAULT   },
             { "GOTO",        KeywordVal.GOTO      },
             { "SIZEOF",      KeywordVal.SIZEOF    },
@@ -106,7 +125,13 @@ namespace CompilerTangoFlex.lexer {
              */
         };
 
-        public override string ToString() {
+        public override Token Clone()
+        {
+            return new TokenKeyword(Val);
+        }
+
+        public override string ToString()
+        {
             return $"({Line}:{Column}): " + Kind + ": " + Val;
         }
 

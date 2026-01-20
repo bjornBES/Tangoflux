@@ -15,15 +15,17 @@ enum public TokenKind : uint8
 
 struct public token {
     var public kind : TokenKind
+    var public value : struct ptr
     var public line : int
     var public column : int
 }
 
-struct public TangoFlexLexer {
+func public TangoFlexLexer(var src : string, void ptr arguments) : void
+{
 
 }
 
-func public Lex(var lexer : ptr TangoFlexLexer, var src : string, void ptr arguments) : void
+func internal Lex() : void 
 {
-
+    
 }
