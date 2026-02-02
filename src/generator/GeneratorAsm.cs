@@ -14,6 +14,8 @@ public class GeneratorAsm : GeneratorBase
     Dictionary<IrTemp, IrConstInt> constTemps = new Dictionary<IrTemp, IrConstInt>();
     Dictionary<string, string> stringLiterals = new Dictionary<string, string>();
 
+    List<string> functionList = new List<string>();
+
     FunctionContext currentContext;
     FunctionFrame currentFrame;
     public GeneratorAsm(IrModule module, Arguments arguments) : base(module, arguments)
@@ -32,14 +34,15 @@ public class GeneratorAsm : GeneratorBase
             }
         }
 
-        TFAsmGen = new TFAsmGen(callingConvention);
         ScratchAllocator = new ScratchRegisterAllocator(callingConvention, registerProfile);
+        TFAsmGen = new TFAsmGen(callingConvention, ScratchAllocator);
     }
 
     public override void GeneratePass()
     {
         foreach (IrFunction f in Module.Functions)
         {
+            functionList.Add(f.Name);
             int offset = 0;
             currentContext = new FunctionContext();
 
@@ -83,7 +86,7 @@ public class GeneratorAsm : GeneratorBase
                 currentContext.AddTemp(t, v);
             }
 
-            int frameSize = align(offset, callingConvention.StackAlignment);
+            int frameSize = align(offset, callingConvention.Stack.Alignment);
 
             currentFrame = TFAsmGen.EnterFunction(f.Name, frameSize, callingConvention, registerProfile);
 
@@ -103,7 +106,7 @@ public class GeneratorAsm : GeneratorBase
 
     void ComputeUseDef(IrBlock block, BlockLiveness lv)
     {
-        foreach (IrInstr instr in block.Instrs)
+        foreach (IrInstr instr in block.Instructions)
         {
             // Uses
             foreach (IrOperand op in instr.Operands)
@@ -132,19 +135,27 @@ public class GeneratorAsm : GeneratorBase
     {
         if (Module.Strings.Count > 0)
         {
-            Output.Add(TFAsmGen.Data());
+            Output.Add(TFAsmGen.Rodata());
             foreach (IrConstStr s in Module.Strings)
             {
                 // Output.Add($"const_str {s.Label} = \"{s.Value}\"");
                 stringLiterals.Add(s.Label, s.Value);
-                Output.Add($"{s.Label}: db \"{s.Value}\"");
-                Output.Add($"{s.Label}_Length: dw $-{s.Label}");
+                Output.Add($"{s.Label}: db {s.Value}");
+                if (Program.Arguments.UseFatStrings == true)
+                {
+                    Output.Add($"{s.Label}_Length: dw $-{s.Label}");
+                }
             }
         }
 
         Output.Add(TFAsmGen.Text());
         foreach (IrFunction f in Module.Functions)
         {
+            if (f.isExternal)
+            {
+                Output.Add($"extern {f.Name}");
+                continue;
+            }
             currentContext = contexts[f];
             currentFrame = frames[f];
 
@@ -160,20 +171,20 @@ public class GeneratorAsm : GeneratorBase
             foreach (IrBlock b in f.Blocks)
             {
                 // Output.Add($"; {b.Label}:");
-                // Console.WriteLine($"New block {b.Label} with {b.Instrs.Count} instrs");
+                // Console.WriteLine($"New block {b.Label} with {b.Instructions.Count} Instructions");
                 // Output.Add($"; new Block");
                 BlockLiveness lv = liveness[b];
-                if (f.Blocks.Last().Instrs.Count != 0)
+                if (f.Blocks.Last().Instructions.Count != 0)
                 {
                     int instrIndex = 0;
-                    foreach (IrInstr i in b.Instrs)
+                    foreach (IrInstr i in b.Instructions)
                     {
                         IrInstr lastInstr = null;
                         if (instrIndex > 0)
                         {
-                            lastInstr = b.Instrs[instrIndex - 1];
+                            lastInstr = b.Instructions[instrIndex - 1];
                         }
-                        bool isLastInstrInFunction = f.Blocks.Last().Instrs.Last() == i;
+                        bool isLastInstrInFunction = f.Blocks.Last().Instructions.Last() == i;
                         GenerateIrInstr(i, isLastInstrInFunction, lastInstr);
                         Output.Add("");
                         instrIndex++;
@@ -207,8 +218,8 @@ public class GeneratorAsm : GeneratorBase
 
                 // LiveOut = union of successors' LiveIn
                 lv.LiveOut.Clear();
-                foreach (IrBlock succ in GetSuccessors(f, b))
-                    lv.LiveOut.UnionWith(liveness[succ].LiveIn);
+                foreach (IrBlock successors in GetSuccessors(f, b))
+                    lv.LiveOut.UnionWith(liveness[successors].LiveIn);
 
                 // LiveIn = Use ∪ (LiveOut - Def)
                 lv.LiveIn.Clear();
@@ -251,7 +262,7 @@ public class GeneratorAsm : GeneratorBase
     {
         if (irOperand == null)
         {
-            Console.WriteLine("unkownen operand");
+            Console.WriteLine("unknown operand");
             throw new InvalidOperationException("Null IR operand");
         }
 
@@ -259,14 +270,14 @@ public class GeneratorAsm : GeneratorBase
         {
             if (currentContext.GetLocalVariable(local, out Variable localVar))
             {
-                return new MemOperand(callingConvention.GetRegister(RegisterFunction.BasePointer), localVar.Size, localVar.StackOffset);
+                return new MemOperand(callingConvention.GetRegister(RegisterRole.BasePointer, "BasePointer"), localVar.Size, localVar.StackOffset);
             }
         }
         else if (irOperand.GetOperand(out IrTemp temp))
         {
             if (constTemps.TryGetValue(temp, out IrConstInt constInt))
             {
-                return new ImmOperand(constInt.Value);
+                return new ImmOperand(constInt.Value) { Type = constInt.Type };
             }
             Variable tempVar;
             if (!currentContext.GetTempVariable(temp, out tempVar))
@@ -281,7 +292,7 @@ public class GeneratorAsm : GeneratorBase
                     RegOperand newReg = ScratchAllocator.AllocateTemp();
                     if (newReg != null)
                     {
-                        Output.Add(TFAsmGen.Move(newReg, new MemOperand(callingConvention.GetRegister(RegisterFunction.BasePointer), tempVar.Size, loc.StackOffset.Value), true));
+                        Output.Add(TFAsmGen.Move(newReg, new MemOperand(callingConvention.GetRegister(RegisterRole.BasePointer, "BasePointer"), tempVar.Size, loc.StackOffset.Value)));
                         Output.Add(TFAsmGen.Comment($"[DEBUG] Allocated temp {temp.Dump()} to {newReg} from stack"));
                         loc.Reg = newReg;
                     }
@@ -289,7 +300,7 @@ public class GeneratorAsm : GeneratorBase
 
                 if (loc.Reg == null || forceNonReg == true)
                 {
-                    return new MemOperand(callingConvention.GetRegister(RegisterFunction.BasePointer), tempVar.Size, loc.StackOffset.Value);
+                    return new MemOperand(callingConvention.GetRegister(RegisterRole.BasePointer, "BasePointer"), tempVar.Size, loc.StackOffset.Value);
                 }
                 return loc.Reg.GetRegisterOpBySize(tempVar.Size);
             }
@@ -311,8 +322,8 @@ public class GeneratorAsm : GeneratorBase
                 // No free registers → spill to stack
                 tempVar = currentContext.temps[temp];
                 currentContext.tempLocations[temp] = new TempLocation { Reg = null, StackOffset = tempVar.StackOffset };
-                Output.Add(TFAsmGen.Comment($"[DEBUG] Allocated temp {temp.Dump()} to {new MemOperand(callingConvention.GetRegister(RegisterFunction.BasePointer), tempVar.Size, tempVar.StackOffset)} on stack"));
-                return new MemOperand(callingConvention.GetRegister(RegisterFunction.BasePointer), tempVar.Size, tempVar.StackOffset);
+                Output.Add(TFAsmGen.Comment($"[DEBUG] Allocated temp {temp.Dump()} to {new MemOperand(callingConvention.GetRegister(RegisterRole.BasePointer, "BasePointer"), tempVar.Size, tempVar.StackOffset)} on stack"));
+                return new MemOperand(callingConvention.GetRegister(RegisterRole.BasePointer, "BasePointer"), tempVar.Size, tempVar.StackOffset);
             }
         }
 
@@ -322,7 +333,7 @@ public class GeneratorAsm : GeneratorBase
         }
         else if (irOperand.GetOperand(out IrLabel label))
         {
-            return new LableOperand(label.Name);
+            return new LabelOperand(label.Name);
         }
         else if (irOperand.GetOperand(out IrSymbol symbol))
         {
@@ -330,18 +341,22 @@ public class GeneratorAsm : GeneratorBase
             {
                 return new PtrOperand(symbol.Name);
             }
+            else if (functionList.Contains(symbol.Name))
+            {
+                return new LabelOperand(symbol.Name);
+            }
             else
             {
                 throw new InvalidOperationException($"String literal not found: {symbol.Name}");
             }
         }
 
-        throw new InvalidOperationException($"Unsupported IR operand: {irOperand.Dump()}");
+        throw new InvalidOperationException($"Unsupported IR operand: {irOperand.Dump()} {irOperand.GetType()}");
     }
     public void GenerateIrInstr(IrInstr instr, bool isLastInstr, IrInstr? lastInstr = null)
     {
-        string instrName = instr.Instr.ToLower();
-
+        Output.Add(TFAsmGen.Comment(instr.Dump()));
+        string instrName = instr.Instructions.ToLower();
         switch (instrName)
         {
             case "move":
@@ -353,34 +368,36 @@ public class GeneratorAsm : GeneratorBase
                         break;
                     }
                     // Output.Add($";   move with {instr.Operands.Count} operands {string.Join(", ", instr.Operands.Select(GenerateIrOperand))} + {GenerateIrOperand(instr.Result)}");
-                    Output.Add(TFAsmGen.Move(GenerateIrOperand(instr.Result), GenerateIrOperand(instr.Operands[0]), true));
+                    Output.Add(TFAsmGen.Move(GenerateIrOperand(instr.Result), GenerateIrOperand(instr.Operands[0])));
                 }
                 else
                 {
                     // Output.Add($";   move with {instr.Operands.Count} operands {string.Join(", ", instr.Operands.Select(GenerateIrOperand))}");
-                    Output.Add(TFAsmGen.Move(GenerateIrOperand(instr.Operands[0]), GenerateIrOperand(instr.Operands[1]), true));
+                    Output.Add(TFAsmGen.Move(GenerateIrOperand(instr.Operands[0]), GenerateIrOperand(instr.Operands[1])));
                 }
                 break;
             case "ret":
                 // Output.Add($";   ret with {instr.Operands.Count} operands {string.Join(", ", instr.Operands.Select(GenerateIrOperand))}");
                 if (instr.Operands.Count > 0)
                 {
-                    Output.Add(TFAsmGen.Move(new RegOperand(callingConvention.GetRegister(RegisterFunction.ReturnInt)), GenerateIrOperand(instr.Operands[0]), true));
+                    Output.Add(TFAsmGen.Move(new RegOperand(callingConvention.GetRegister(RegisterRole.ReturnLow, "Return")), GenerateIrOperand(instr.Operands[0])));
                 }
                 else
                 {
-                    Output.Add(TFAsmGen.Move(new RegOperand(callingConvention.GetRegister(RegisterFunction.ReturnInt)), new ImmOperand(0), true));
+                    Output.Add(TFAsmGen.Move(new RegOperand(callingConvention.GetRegister(RegisterRole.ReturnLow, "Return")), new ImmOperand(0)));
                 }
                 if (!isLastInstr)
                 {
                     // Output.Add($";   jmp to {currentFrame.FunctionName}_end");
-                    Output.Add(TFAsmGen.Jump(new LableOperand($"{currentFrame.FunctionName}_end")));
+                    Output.Add(TFAsmGen.Jump(new LabelOperand($"{currentFrame.FunctionName}_end")));
                 }
                 break;
             case "neq": // not equal
             case "eq":  // equal
             case "leq": // less than or equal
+            case "lt":  // less than
             case "geq": // greater than or equal
+            case "gt":  // greater than
                 GenerateIrCompareInstr(instr);
                 break;
             case "cjump":
@@ -415,19 +432,59 @@ public class GeneratorAsm : GeneratorBase
                 GenerateIrArithmeticInstr(instr);
                 break;
             case "load":
-                RegOperand baseReg = new RegOperand(callingConvention.GetRegister(RegisterFunction.AddressBase));
-                RegOperand indexReg = new RegOperand(callingConvention.GetRegister(RegisterFunction.AddressIndex));
 
+                RegOperand baseReg = new RegOperand(callingConvention.GetRegister(RegisterRole.AddressBase, "address base"));
+                RegOperand indexReg = new RegOperand(callingConvention.GetRegister(RegisterRole.AddressIndex, "address index"));
+
+                Output.Add(TFAsmGen.Move(baseReg, GenerateIrOperand(instr.Operands[0], forceNonAlloc: true)));
                 Output.Add(TFAsmGen.Move(indexReg, GenerateIrOperand(instr.Operands[1], forceNonAlloc: true)));
                 Output.Add(TFAsmGen.Move(GenerateIrOperand(instr.Result), new MemRegOperand(baseReg.Register, instr.Result.Type.SizeInBits / 8, indexReg.Register)));
                 break;
             case "addr_of":
-                RegOperand baseAddrReg = new RegOperand(callingConvention.GetRegister(RegisterFunction.AddressBase));
-                Output.Add(TFAsmGen.Lea(baseAddrReg, GenerateIrOperand(instr.Operands[0], forceNonAlloc: true)));
-                Output.Add(TFAsmGen.Move(GenerateIrOperand(instr.Result), baseAddrReg));
+                if (instr.Operands[0].GetType() == typeof(IrLocal) || (!callingConvention.SupportsRipRelative))
+                {
+                    RegOperand baseAddrReg = new RegOperand(callingConvention.GetRegister(RegisterRole.AddressBase, "address base"));
+                    Output.Add(TFAsmGen.Lea(baseAddrReg, GenerateIrOperand(instr.Operands[0], forceNonAlloc: true)));
+                    Output.Add(TFAsmGen.Move(GenerateIrOperand(instr.Result), baseAddrReg));
+                }
+                else
+                {
+                    Output.Add(TFAsmGen.Lea(GenerateIrOperand(instr.Result), GenerateIrOperand(instr.Operands[0], forceNonAlloc: true)));
+                }
+                break;
+
+            case "call":
+                {
+                    List<AsmOperand> args = new List<AsmOperand>();
+                    for (int i = 1; i < instr.Operands.Count; i++)
+                    {
+                        args.Add(GenerateIrOperand(instr.Operands[i]));
+                    }
+                    Output.Add(callingConvention.EmitCall(TFAsmGen, GenerateIrOperand(instr.Operands[0]), args));
+                    if (instr.Result != null)
+                    {
+                        AsmOperand result = GenerateIrOperand(instr.Result);
+                        Output.Add(TFAsmGen.Move(result, new RegOperand(callingConvention.GetRegister(RegisterRole.ReturnLow, "Return"))));
+                    }
+                }
+                break;
+            case "syscall":
+                {
+                    List<AsmOperand> args = new List<AsmOperand>();
+                    for (int i = 1; i < instr.Operands.Count; i++)
+                    {
+                        args.Add(GenerateIrOperand(instr.Operands[i], forceNonAlloc: true));
+                    }
+                    Output.Add(callingConvention.EmitSyscall(TFAsmGen, GenerateIrOperand(instr.Operands[0], forceNonAlloc: true), args));
+                    if (instr.Result != null)
+                    {
+                        AsmOperand result = GenerateIrOperand(instr.Result);
+                        Output.Add(TFAsmGen.Move(result, new RegOperand(callingConvention.GetRegister(RegisterRole.ReturnLow, "Return"))));
+                    }
+                }
                 break;
             default:
-                Output.Add($";   {instr.Dump()}");
+                Output.Add($";   need to implement {instr.Dump()}");
                 break;
         }
     }
@@ -439,32 +496,35 @@ public class GeneratorAsm : GeneratorBase
         AsmOperand lhs = org;
         if (lhs is ImmOperand _)
         {
-            lhs = GetScratch(lhs);
+            RegOperand scratch = ScratchAllocator.Allocate();
+            Output.Add(TFAsmGen.Comment($"[DEBUG] Allocated scratch register {scratch}"));
+            Output.Add(TFAsmGen.Move(scratch, lhs));
+            lhs = scratch;
         }
-        switch (instr.Instr.ToLower())
+        switch (instr.Instructions.ToLower())
         {
             case "add":
                 Output.Add(TFAsmGen.Add(lhs, GenerateIrOperand(instr.Operands[1])));
-                Output.Add(TFAsmGen.Move(GenerateIrOperand(instr.Result, forceNonAlloc:true), lhs));
+                Output.Add(TFAsmGen.Move(GenerateIrOperand(instr.Result, forceNonAlloc: true), lhs));
                 break;
             case "sub":
                 Output.Add(TFAsmGen.Sub(lhs, GenerateIrOperand(instr.Operands[1])));
                 Output.Add(TFAsmGen.Move(GenerateIrOperand(instr.Result), lhs));
                 break;
             case "mul":
-                Output.Add(TFAsmGen.Move(new RegOperand(callingConvention.GetRegister(RegisterFunction.MultiplySource1)), GenerateIrOperand(instr.Operands[0]), true));
+                Output.Add(TFAsmGen.Move(new RegOperand(callingConvention.GetRegister(RegisterRole.MultiplySource1, "Multiply not supported on this target")), GenerateIrOperand(instr.Operands[0])));
                 Output.Add(TFAsmGen.Mul(GenerateIrOperand(instr.Operands[1])));
-                Output.Add(TFAsmGen.Move(GenerateIrOperand(instr.Result), new RegOperand(callingConvention.GetRegister(RegisterFunction.MultiplyResultLow))));
+                Output.Add(TFAsmGen.Move(GenerateIrOperand(instr.Result), new RegOperand(callingConvention.GetRegister(RegisterRole.MultiplyResultLow, "Multiply not supported on this target"))));
                 break;
             case "div":
-                Output.Add(TFAsmGen.Move(new RegOperand(callingConvention.GetRegister(RegisterFunction.DivideDividendLow)), GenerateIrOperand(instr.Operands[0]), true));
+                Output.Add(TFAsmGen.Move(new RegOperand(callingConvention.GetRegister(RegisterRole.DivideDividendLow, "Divide not supported on this target")), GenerateIrOperand(instr.Operands[0])));
                 Output.Add(TFAsmGen.Div(GenerateIrOperand(instr.Operands[1])));
-                Output.Add(TFAsmGen.Move(GenerateIrOperand(instr.Result), new RegOperand(callingConvention.GetRegister(RegisterFunction.DivideQuotient))));
+                Output.Add(TFAsmGen.Move(GenerateIrOperand(instr.Result), new RegOperand(callingConvention.GetRegister(RegisterRole.DivideQuotient, "Divide not supported on this target"))));
                 break;
             case "mod":
-                Output.Add(TFAsmGen.Move(new RegOperand(callingConvention.GetRegister(RegisterFunction.DivideDividendLow)), GenerateIrOperand(instr.Operands[0]), true));
+                Output.Add(TFAsmGen.Move(new RegOperand(callingConvention.GetRegister(RegisterRole.DivideDividendLow, "Divide not supported on this target")), GenerateIrOperand(instr.Operands[0])));
                 Output.Add(TFAsmGen.Div(GenerateIrOperand(instr.Operands[1])));
-                Output.Add(TFAsmGen.Move(GenerateIrOperand(instr.Result), new RegOperand(callingConvention.GetRegister(RegisterFunction.DivideRemainder))));
+                Output.Add(TFAsmGen.Move(GenerateIrOperand(instr.Result), new RegOperand(callingConvention.GetRegister(RegisterRole.DivideRemainder, "Divide not supported on this target"))));
                 break;
         }
 
@@ -482,7 +542,7 @@ public class GeneratorAsm : GeneratorBase
         AsmOperand operand = GetScratch(dst);
 
         Output.Add(TFAsmGen.ZeroReg(operand));
-        switch (instr.Instr.ToLower())
+        switch (instr.Instructions.ToLower())
         {
             case "eq":
                 Output.Add(TFAsmGen.Compare(GenerateIrOperand(instr.Operands[0]), GenerateIrOperand(instr.Operands[1])));
@@ -499,6 +559,14 @@ public class GeneratorAsm : GeneratorBase
             case "geq":
                 Output.Add(TFAsmGen.Compare(GenerateIrOperand(instr.Operands[0]), GenerateIrOperand(instr.Operands[1])));
                 Output.Add(TFAsmGen.Setge(operand));
+                break;
+            case "lt":
+                Output.Add(TFAsmGen.Compare(GenerateIrOperand(instr.Operands[0]), GenerateIrOperand(instr.Operands[1])));
+                Output.Add(TFAsmGen.Setl(operand));
+                break;
+            case "gt":
+                Output.Add(TFAsmGen.Compare(GenerateIrOperand(instr.Operands[0]), GenerateIrOperand(instr.Operands[1])));
+                Output.Add(TFAsmGen.Setg(operand));
                 break;
         }
         if (operand is RegOperand reg && dst is not RegOperand)
@@ -518,7 +586,7 @@ public class GeneratorAsm : GeneratorBase
         {
             RegOperand scratch = ScratchAllocator.Allocate();
             Output.Add(TFAsmGen.Comment($"[DEBUG] Allocated scratch register {scratch}"));
-            Output.Add(TFAsmGen.Move(scratch, result, true));
+            Output.Add(TFAsmGen.Comment(TFAsmGen.Move(scratch, result)));
             return scratch;
         }
     }
@@ -527,10 +595,10 @@ public class GeneratorAsm : GeneratorBase
         if (dst is MemOperand && src is MemOperand && dstValue is MemOperand)
         {
             RegOperand scratch = ScratchAllocator.Allocate();
-            Output.Add(TFAsmGen.Move(scratch, dstValue, true));
+            Output.Add(TFAsmGen.Move(scratch, dstValue));
             return scratch;
         }
-        Output.Add(TFAsmGen.Move(dst, dstValue, true));
+        Output.Add(TFAsmGen.Move(dst, dstValue));
         return dst;
     }
 }

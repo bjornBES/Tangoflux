@@ -1,9 +1,9 @@
-public sealed class LableOperand : AsmOperand
+public sealed class LabelOperand : AsmOperand
 {
     public string Base;
     public int Offset;
 
-    public LableOperand(string baseAddress, int offset = 0)
+    public LabelOperand(string baseAddress, int offset = 0)
     {
         Base = baseAddress;
         Offset = offset;
@@ -24,5 +24,13 @@ public sealed class LableOperand : AsmOperand
         if (Offset == 0)
             return $"{Base}";
         return $"[{Base}{(Offset > 0 ? "+" : "")}{Offset}]";
+    }
+    public string ToStringWithPrefix()
+    {
+        if (Offset == 0)
+        {
+            return ToString();
+        }
+        return $"[rel {Base}]";
     }
 }

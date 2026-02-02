@@ -5,7 +5,8 @@ namespace CompilerTangoFlex.lexer {
         NONE,
         END,
         RUNNING,
-        ERROR
+        ERROR,
+        FINISH
     }
 
     public abstract class FSA {

@@ -1,11 +1,6 @@
 
 using CompilerTangoFlex.lexer;
 
-public class NodeVisibility
-{
-    public KeywordVal visibility { get; set; }
-}
-
 public class NodeCallingConventions
 {
     public TokenIdentifier cc { get; set; }
@@ -32,4 +27,5 @@ public class NodeStmtFuncDecl : IStmt
     public NodeType returnType {get; set;}
     public List<FuncArguments> parameters {get; set;} = new List<FuncArguments>();
     public NodeStmtScope scope {get; set;}
+    public string file;
 }

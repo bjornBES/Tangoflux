@@ -12,8 +12,11 @@ using System.Text.Json.Serialization;
 [JsonDerivedType(typeof(NodeStmtWhileLoop), "NodeStmtWhileLoop")]
 [JsonDerivedType(typeof(NodeStmtCallFunction), "NodeStmtCallFunction")]
 [JsonDerivedType(typeof(NodeStmtExternal), "NodeStmtExternal")]
-public interface IStmt
+[JsonDerivedType(typeof(NodeStmtExpr), "NodeStmtExpr")]
+[JsonDerivedType(typeof(NodeStmtNamespace), "NodeStmtNamespace")]
+public abstract class IStmt
 {
+    public SourceSpan SourceSpan{ get; set; }
 }
 
 public class NodeStmt
@@ -21,7 +24,7 @@ public class NodeStmt
     public IStmt stmt { get; set; }
     public bool GetTrueType<T>(out T out_stmt) where T : IStmt
     {
-        if (stmt.GetType() == typeof(T) && stmt is T inst)
+        if (stmt is T inst)
         {
             out_stmt = inst;
             return true;

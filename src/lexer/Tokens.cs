@@ -1,7 +1,10 @@
 ﻿using System;
+using System.Text.Json.Serialization;
 
-namespace CompilerTangoFlex.lexer {
-    public enum TokenKind {
+namespace CompilerTangoFlex.lexer
+{
+    public enum TokenKind
+    {
         NONE,
         FLOAT,
         INT,
@@ -13,36 +16,55 @@ namespace CompilerTangoFlex.lexer {
         NEWLINE,
         PREPROCESSOR,
     }
-
-    public abstract class Token {
-        public override string ToString() {
+    public abstract class Token
+    {
+        public override string ToString()
+        {
             return Kind.ToString();
         }
         public abstract Token Clone();
+        public abstract object GetData();
         public abstract TokenKind Kind { get; }
+        public SourceSpan SourceSpan { get; set; }
         public int Line { get; set; }
         public int Column { get; set; }
+        public string File { get; set; }
+        [JsonPropertyName("Value")]
+        public object _value { get => GetData(); }
     }
 
-    public sealed class EmptyToken : Token {
+    public sealed class EmptyToken : Token
+    {
         public override TokenKind Kind { get; } = TokenKind.NONE;
         public override Token Clone()
         {
             return new EmptyToken();
         }
+
+        public override object GetData()
+        {
+            return "";
+        }
     }
 
     public sealed class NewlineToken : Token
     {
-        public override TokenKind Kind { get;} = TokenKind.NEWLINE;
+        public override TokenKind Kind { get; } = TokenKind.NEWLINE;
         public override Token Clone()
         {
             return new NewlineToken();
         }
+
+        public override object GetData()
+        {
+            return "";
+        }
     }
 
-    public sealed class FSASpace : FSA {
-        private enum State {
+    public sealed class FSASpace : FSA
+    {
+        private enum State
+        {
             START,
             END,
             ERROR,
@@ -51,56 +73,73 @@ namespace CompilerTangoFlex.lexer {
 
         private State _state;
 
-        public FSASpace() {
+        public FSASpace()
+        {
             _state = State.START;
         }
 
-        public override void Reset() {
+        public override void Reset()
+        {
             _state = State.START;
         }
 
-        public override FSAStatus GetStatus() {
-            if (_state == State.START) {
+        public override FSAStatus GetStatus()
+        {
+            if (_state == State.START)
+            {
                 return FSAStatus.NONE;
             }
-            if (_state == State.END) {
+            if (_state == State.END)
+            {
                 return FSAStatus.END;
             }
-            if (_state == State.ERROR) {
+            if (_state == State.ERROR)
+            {
                 return FSAStatus.ERROR;
             }
             return FSAStatus.RUNNING;
         }
 
-        public override Token RetrieveToken() {
+        public override Token RetrieveToken()
+        {
             return new EmptyToken();
         }
 
-        public override void ReadChar(char ch) {
-            switch (_state) {
+        public override void ReadChar(char ch)
+        {
+            switch (_state)
+            {
                 case State.END:
                 case State.ERROR:
                     _state = State.ERROR;
                     break;
                 case State.START:
-                    if (Utils.IsSpace(ch)) {
+                    if (Utils.IsSpace(ch))
+                    {
                         _state = State.SPACE;
-                    } else {
+                    }
+                    else
+                    {
                         _state = State.ERROR;
                     }
                     break;
                 case State.SPACE:
-                    if (Utils.IsSpace(ch)) {
+                    if (Utils.IsSpace(ch))
+                    {
                         _state = State.SPACE;
-                    } else{
+                    }
+                    else
+                    {
                         _state = State.END;
                     }
                     break;
             }
         }
 
-        public override void ReadEOF() {
-            switch (_state) {
+        public override void ReadEOF()
+        {
+            switch (_state)
+            {
                 case State.SPACE:
                     _state = State.END;
                     break;
@@ -111,8 +150,10 @@ namespace CompilerTangoFlex.lexer {
         }
     }
 
-    public sealed class FSANewLine : FSA {
-        private enum State {
+    public sealed class FSANewLine : FSA
+    {
+        private enum State
+        {
             START,
             END,
             ERROR,
@@ -121,55 +162,68 @@ namespace CompilerTangoFlex.lexer {
 
         private State _state;
 
-        public FSANewLine() {
+        public FSANewLine()
+        {
             _state = State.START;
         }
 
-        public override void Reset() {
+        public override void Reset()
+        {
             _state = State.START;
         }
 
-        public override FSAStatus GetStatus() {
-            if (_state == State.START) {
+        public override FSAStatus GetStatus()
+        {
+            if (_state == State.START)
+            {
                 return FSAStatus.NONE;
             }
-            if (_state == State.END) {
+            if (_state == State.END)
+            {
                 return FSAStatus.END;
             }
-            if (_state == State.ERROR) {
+            if (_state == State.ERROR)
+            {
                 return FSAStatus.ERROR;
             }
             return FSAStatus.RUNNING;
         }
 
-        public override Token RetrieveToken() {
+        public override Token RetrieveToken()
+        {
             return new NewlineToken();
         }
 
         public override void ReadChar(char ch)
         {
-            switch (_state) {
+            switch (_state)
+            {
                 case State.END:
                 case State.ERROR:
                     _state = State.ERROR;
                     break;
                 case State.START:
-                    if (ch == '\n') {
+                    if (ch == '\n')
+                    {
                         _state = State.NEWLINE;
-                    } else {
+                    }
+                    else
+                    {
                         _state = State.ERROR;
                     }
                     break;
                 case State.NEWLINE:
-                LexerConfig.Line++;
-                LexerConfig.Column = 0;
+                    LexerConfig.Line++;
+                    LexerConfig.Column = 0;
                     _state = State.END;
                     break;
             }
         }
 
-        public override void ReadEOF() {
-            switch (_state) {
+        public override void ReadEOF()
+        {
+            switch (_state)
+            {
                 case State.NEWLINE:
                     _state = State.END;
                     break;

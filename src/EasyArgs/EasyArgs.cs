@@ -366,9 +366,9 @@ namespace BjornBEs.Libs.EasyArgs
 
         static object ConvertTo(string raw, Type t)
         {
-            var conv = TypeDescriptor.GetConverter(t);
-            if (conv != null && conv.CanConvertFrom(typeof(string)))
-                return conv.ConvertFromInvariantString(raw);
+            var convented = TypeDescriptor.GetConverter(t);
+            if (convented != null && convented.CanConvertFrom(typeof(string)))
+                return convented.ConvertFromInvariantString(raw);
 
             return Convert.ChangeType(raw, t);
         }

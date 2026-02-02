@@ -8,12 +8,19 @@ using CompilerTangoFlex.lexer;
 public class IrType
 {
     public static IrType Void = new IrType(KeywordVal.VOID);
+    public static IrType VoidPtr = new IrType(new NodeType() { Type = KeywordVal.PTR, NestedTypes = new NodeType() { Type = KeywordVal.VOID }});
     public static IrType Boolean = new IrType(KeywordVal.BOOL);
+    public static IrType ULong = new IrType(KeywordVal.UINT64);
     public static IrType Int = new IrType(KeywordVal.INT);
+    public static IrType UShort = new IrType(KeywordVal.UINT16);
+    public static IrType Byte = new IrType(KeywordVal.UINT8);
+    public static IrType BytePtr = new IrType(new NodeType() { Type = KeywordVal.PTR, NestedTypes = new NodeType() { Type = KeywordVal.VOID }});
     public static IrType String = new IrType(KeywordVal.STRING);
 
     public int SizeInBits { get; set; }
+    public int SizeInBytes { get; set; }
     public bool IsSigned { get; set; }
+    public int Alignment { get; set; }
     public IrType? RefType { get; set; }
 
     public IrType(KeywordVal keyword)
@@ -31,39 +38,62 @@ public class IrType
         switch (type.Type)
         {
             case KeywordVal.PTR:
-                SizeInBits = 32;
+                if (Program.Arguments.Bits == 32)
+                {
+                    SizeInBits = 32;
+                    SizeInBytes = 4;
+                    Alignment = 4;
+                }
+                else if (Program.Arguments.Bits == 64)
+                {
+                    SizeInBits = 64;
+                    SizeInBytes = 8;
+                    Alignment = 8;
+                }
                 IsSigned = false;
                 RefType = new IrType(type.NestedTypes);
                 break;
 
             case KeywordVal.INT8:
                 SizeInBits = 8;
+                SizeInBytes = 1;
+                Alignment = 1;
                 IsSigned = true;
                 break;
 
             case KeywordVal.UINT8:
             case KeywordVal.BOOL:
                 SizeInBits = 8;
+                SizeInBytes = 1;
+                Alignment = 1;
                 IsSigned = false;
                 break;
 
             case KeywordVal.INT16:
                 SizeInBits = 16;
+                SizeInBytes = 2;
+                Alignment = 2;
                 IsSigned = true;
                 break;
 
             case KeywordVal.UINT16:
                 SizeInBits = 16;
+                SizeInBytes = 2;
+                Alignment = 2;
                 IsSigned = false;
                 break;
 
             case KeywordVal.INT32:
                 SizeInBits = 32;
+                SizeInBytes = 4;
+                Alignment = 4;
                 IsSigned = true;
                 break;
 
             case KeywordVal.UINT32:
                 SizeInBits = 32;
+                SizeInBytes = 4;
+                Alignment = 4;
                 IsSigned = false;
                 break;
 
@@ -73,24 +103,39 @@ public class IrType
 
             case KeywordVal.INT64:
                 SizeInBits = 64;
+                SizeInBytes = 8;
+                Alignment = 8;
                 IsSigned = true;
                 break;
 
             case KeywordVal.UINT64:
                 SizeInBits = 64;
+                SizeInBytes = 8;
+                Alignment = 8;
                 IsSigned = false;
                 break;
 
             case KeywordVal.STRING:
-                // TODO: LowerStringType
-                // use fat strings at some point (not now)
-                // def: fat strings is a string that has the length in it
-                SizeInBits = 64;
-                IsSigned = false;
-                RefType = new IrType(KeywordVal.UINT8);
+            if (Program.Arguments.UseFatStrings)
+                {
+                    // TODO: LowerStringType
+                    // use fat strings at some point (not now)
+                    // def: fat strings is a string that has the length in it
+                }
+                else
+                {
+                    // cstring just the value
+                    Alignment = 8;
+                    SizeInBytes = 8;
+                    SizeInBits = 64;
+                    IsSigned = false;
+                    RefType = new IrType(KeywordVal.UINT8);
+                }
                 break;
 
             case KeywordVal.VOID:
+                Alignment = 0;
+                SizeInBytes = 0;
                 SizeInBits = 0;
                 IsSigned = false;
                 break;
@@ -151,6 +196,33 @@ public class IrType
 
         return $"<unknown:{type.SizeInBits}>";
     }
+
+    public override bool Equals(object obj)
+    {
+        if (obj == null)
+        {
+            return false;
+        }
+
+        if (obj.GetType() == typeof(IrType))
+        {
+            return Equals((IrType)obj);
+        }
+        return false;
+    }
+
+    public bool Equals(IrType type)
+    {
+        if (SizeInBytes == type.SizeInBytes && IsSigned == type.IsSigned && Alignment == type.Alignment)
+        {
+            if (RefType != null && type.RefType != null)
+            {
+                return RefType.Equals(type.RefType); 
+            }
+            return true;
+        }
+        return false;
+    }
 }
 
 public abstract class IrOperand
@@ -188,8 +260,28 @@ public class IrLocal : IrOperand
 public class IrConstInt : IrOperand
 {
     public long Value { get; }
-    public IrConstInt(long v) { Value = v; }
-    public override string Dump() => $"constI64 {Value}";
+    public IrType Type { get; }
+    public IrConstInt(long v, IrType type)
+    {
+        Value = v;
+        Type = type;
+    }
+    public override string Dump()
+    {
+        switch (Type.SizeInBits)
+        {
+            case 64:
+                return $"constI64 {Value}";
+            case 32:
+                return $"constI32 {Value}";
+            case 16:
+                return $"constI16 {Value}";
+            case 8:
+                return $"constI8 {Value}";
+                
+        }
+        return $"constI64 {Value}";
+    }
 }
 
 public class IrConstFloat : IrOperand
@@ -227,13 +319,13 @@ public class IrInstr
     /// This is this > [this] = Something
     /// </summary>
     public IrTemp Result { get; set; }
-    public string Instr { get; }
+    public string Instructions { get; }
     public List<IrOperand> Operands { get; } = new List<IrOperand>();
     public string Extra { get; set; }
 
     public IrInstr(string instr, IrTemp result = null, params IrOperand[] operands)
     {
-        Instr = instr;
+        Instructions = instr;
         Result = result;
         Operands = operands.ToList();
     }
@@ -242,7 +334,7 @@ public class IrInstr
     {
         var sb = new StringBuilder();
         if (Result != null) sb.Append($"{Result.Dump()} = ");
-        sb.Append(Instr);
+        sb.Append(Instructions);
         if (Operands.Count > 0)
             sb.Append(" " + string.Join(", ", Operands.Select(o => o.Dump())));
         if (!string.IsNullOrEmpty(Extra)) sb.Append(" " + Extra);
@@ -254,7 +346,7 @@ public class IrInstr
 public class IrBlock
 {
     public string Label { get; set; }
-    public List<IrInstr> Instrs { get; set; } = new List<IrInstr>();
+    public List<IrInstr> Instructions { get; set; } = new List<IrInstr>();
     public IrBlock(string label)
     {
         Label = label;
@@ -269,6 +361,7 @@ public class IrFunction
     public List<IrTemp> Temps { get; set; } = new List<IrTemp>();
     public List<IrBlock> Blocks { get; set; } = new List<IrBlock>();
     public List<IrLocal> Parameters { get; set; } = new List<IrLocal>();
+    public bool isExternal = false;
     public int tempCounter = 0;
     public int blockCounter = 0;
 
@@ -298,10 +391,52 @@ public class IrFunction
     }
 }
 
+
+public sealed class IrStructField
+{
+    public string Name { get; }
+    public IrType Type { get; }
+    public NodeVisibility Visibility { get; }
+    public int Index { get; }   // VERY important
+
+    public IrStructField(string name, IrType type, NodeVisibility visibility, int index)
+    {
+        Name = name;
+        Type = type;
+        Visibility = visibility;
+        Index = index;
+    }
+}
+
+public sealed class IrStruct
+{
+    public string Name { get; }
+    public NodeVisibility Visibility { get; }
+    public StructLayout Layout {get; set;}
+    public bool IsPacked;
+    public List<IrStructField> Fields { get; } = new();
+
+    public IrStruct(string name, NodeVisibility visibility)
+    {
+        Name = name;
+        Visibility = visibility;
+    }
+}
+
+public sealed class StructLayout
+{
+    public int Size;
+    public int Alignment;
+    public List<int> FieldOffsets;
+}
+
+
 public class IrModule
 {
     public List<IrConstStr> Strings { get; } = new();
+    public List<IrStruct> Structs { get; } = new();
     public List<IrFunction> Functions { get; } = new();
+    public List<IrLocal> Globals { get; } = new();
     public IrConstStr InternString(string s)
     {
         var found = Strings.FirstOrDefault(x => x.Value == s);
@@ -312,6 +447,17 @@ public class IrModule
     }
     public IrFunction AddFunction(IrFunction f)
     {
+        Functions.Add(f);
+        return f;
+    }
+    public IrStruct AddStruct(IrStruct s)
+    {
+        Structs.Add(s);
+        return s;
+    }
+    public IrFunction AddExternalFunction(IrFunction f)
+    {
+        f.isExternal = true;
         Functions.Add(f);
         return f;
     }

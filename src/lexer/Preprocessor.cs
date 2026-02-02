@@ -15,6 +15,11 @@ namespace CompilerTangoFlex.lexer
         PREIFNDEF,
         PREELSE,
         PREELIF,
+        PREFILE,
+        PREENDFILE,
+        PREINCLUDE,
+        PRENAMESPACE,
+        PREIMPORT,
     }
 
     public class TokenPreprocessor : Token
@@ -36,16 +41,27 @@ namespace CompilerTangoFlex.lexer
             { "#DEFINE",    PreprocessorVal.PREDEFINE    },
             { "#UNDEF",     PreprocessorVal.PREUNDEF     },
             { "#ENDIF",     PreprocessorVal.PREENDIF     },
+            { "#FILE",      PreprocessorVal.PREFILE      },
+            { "#ENDFILE",   PreprocessorVal.PREENDFILE   },
+            { "#INCLUDE",   PreprocessorVal.PREINCLUDE   },
+            { "#NAMESPACE", PreprocessorVal.PRENAMESPACE },
+            { "#IMPORT",    PreprocessorVal.PREIMPORT    },
         };
 
         public override string ToString()
         {
-            return $"({Line}:{Column}): " + Kind + ": " + Val;
+            return $"({File}:{Line}:{Column}): " + Kind + ": " + Val;
         }
 
         public override Token Clone()
         {
             return new TokenPreprocessor(Val);
+        }
+
+        public override object GetData()
+        {
+            int valueIndex = PreprocessorKeywords.Values.ToList().IndexOf(Val);
+            return PreprocessorKeywords.Keys.ElementAt(valueIndex).ToString();
         }
     }
 
@@ -93,6 +109,15 @@ namespace CompilerTangoFlex.lexer
         public override Token RetrieveToken()
         {
             string name = _scanned.Substring(0, _scanned.Length - 1);
+            if (TokenPreprocessor.PreprocessorKeywords.ContainsKey(name))
+            {
+                return new TokenPreprocessor(TokenPreprocessor.PreprocessorKeywords[name]);
+            }
+            return new EmptyToken();
+        }
+        public Token RetrieveToken(string keyword)
+        {
+            string name = keyword.Substring(0, keyword.Length);
             if (TokenPreprocessor.PreprocessorKeywords.ContainsKey(name))
             {
                 return new TokenPreprocessor(TokenPreprocessor.PreprocessorKeywords[name]);

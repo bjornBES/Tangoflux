@@ -1,15 +1,15 @@
 public sealed class RegisterTracker
 {
     private readonly FunctionFrame frame;
-    private readonly ICallingConvention conv;
+    private readonly ICallingConvention convention;
     private readonly RegisterProfile profile;
 
     private readonly HashSet<string> calleeSavedNames;
 
-    public RegisterTracker(FunctionFrame frame, ICallingConvention conv, RegisterProfile profile)
+    public RegisterTracker(FunctionFrame frame, ICallingConvention convention, RegisterProfile profile)
     {
         this.frame = frame;
-        this.conv = conv;
+        this.convention = convention;
         this.profile = profile;
 
         calleeSavedNames = PrologueEpilogueCalleeSavedNames(profile);

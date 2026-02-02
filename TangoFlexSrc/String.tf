@@ -3,12 +3,12 @@ func main(argc : int32, argv : cstring ptr) : int
     // strings are structs that look something like this
     // struct string {
     // var length : uint32
-    // [defualt]
+    // [default]
     // var str : byte ptr
     // }
 
     // struct cstring {
-    // [defualt]
+    // [default]
     // var str : byte ptr
     // }
 
@@ -31,13 +31,13 @@ func main(argc : int32, argv : cstring ptr) : int
     // string::value from this get value
     // = str.value set from str.value
     // length is 0 in this case
-    // you'll need this following expt to set the length
+    // you'll need this following expr to set the length
     var str2 : string = string::length = str.length
     // or
     str2.length = str.length
 
     // if a string is a pointer
-    // it can't carry any infomation
+    // it can't carry any information
     // length is always external or explicit
 
     // notes
@@ -45,7 +45,11 @@ func main(argc : int32, argv : cstring ptr) : int
     // string handles/pointer live on the stack
     // a pointer to the string is in the stack
 
-    // by defualt
+    // by default
     // string.value is 0
     // string.length is 0
+
+    // if the --fat-string flag is pass the string
+    // will have the value and length fields
+    // if not it will be treated as a cstring
 }

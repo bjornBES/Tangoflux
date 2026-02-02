@@ -1,85 +1,101 @@
+using System.Collections.Immutable;
+
 public class ScratchRegisterAllocator
 {
-    private readonly ICallingConvention conv;
+    private readonly ICallingConvention convention;
     private readonly RegisterProfile profile;
 
     // pool of available registers (RegOperand)
-    private readonly Stack<RegOperand> freeRegs = new Stack<RegOperand>();
-    private readonly HashSet<RegisterInfo> inUse = new HashSet<RegisterInfo>();
+    private readonly Stack<PhysicalRegister> freeRegisters = new Stack<PhysicalRegister>();
+    private readonly HashSet<RegOperand> inUse = new HashSet<RegOperand>();
 
-    public ScratchRegisterAllocator(ICallingConvention conv, RegisterProfile profile)
+    public ScratchRegisterAllocator(ICallingConvention convention, RegisterProfile profile)
     {
-        this.conv = conv;
+        this.convention = convention;
         this.profile = profile;
 
         // initialize pool
-        foreach (var r in GetScratchRegisters(profile, conv))
-            freeRegs.Push(new RegOperand(r));
+        foreach (PhysicalRegister r in GetScratchRegisters(profile, convention))
+            freeRegisters.Push(r);
     }
 
-    private static IEnumerable<RegisterInfo> GetScratchRegisters(RegisterProfile profile, ICallingConvention conv)
+    private static IEnumerable<PhysicalRegister> GetScratchRegisters(RegisterProfile profile, ICallingConvention convention)
     {
-        switch (profile)
-        {
-            case RegisterProfile.X86_64_SysV:
-                return new[]
-                {
-                    conv.GetRegister(RegisterFunction.Scratch) ?? new RegisterInfo("rax",3),
-                    conv.GetRegister(RegisterFunction.Arg0) ?? new RegisterInfo("rdi",4),
-                    // conv.GetRegister(RegisterFunction.Arg1) ?? new RegisterInfo("rsi",5),
-                    conv.GetRegister(RegisterFunction.Arg2) ?? new RegisterInfo("rdx",6),
-                    conv.GetRegister(RegisterFunction.Arg3) ?? new RegisterInfo("r10",7),
-                    conv.GetRegister(RegisterFunction.Arg4) ?? new RegisterInfo("r8",8),
-                    conv.GetRegister(RegisterFunction.Arg5) ?? new RegisterInfo("r9",9),
-                    new RegisterInfo("rcx",10),
-                    new RegisterInfo("r11",11),
-                };
-            default:
-                throw new NotImplementedException();
-        }
+        return convention.ScratchRegisters;
     }
 
     public RegOperand? Allocate()
     {
-        if (freeRegs.Count == 0)
+        if (freeRegisters.Count == 0)
         {
             Console.WriteLine("No scratch registers available!");
             return null;
         }
 
-        var r = freeRegs.Pop();
-        Console.WriteLine($"Allocating register: {r}");
-        inUse.Add(r.Register);
+        RegOperand r = new RegOperand(freeRegisters.Pop().GetInfo());
+        // Console.WriteLine($"Allocating register: {r}");
+        inUse.Add(r);
         return r;
     }
     public RegOperand? AllocateTemp()
     {
-        if (freeRegs.Count == 0)
+        if (freeRegisters.Count == 0)
         {
             Console.WriteLine("No scratch registers available!");
             return null;
         }
-        // 2 left to avoid exhausting all scratch regs
-        if (freeRegs.Count <= 2)
+        // 2 left to avoid exhausting all scratch registers
+        if (freeRegisters.Count <= 2)
         {
-            Console.WriteLine("Exceeded max scratch registers!");
+            // Console.WriteLine("Exceeded max scratch registers!");
             return null;
         }
 
-        RegOperand r = freeRegs.Pop();
-        Console.WriteLine($"Allocating temp register: {r}");
-        inUse.Add(r.Register);
+        RegOperand r = new RegOperand(freeRegisters.Pop().GetInfo());
+        // Console.WriteLine($"Allocating temp register: {r}");
+        inUse.Add(r);
         return r;
     }
 
     public void Release(RegOperand r)
     {
-        if (!inUse.Remove(r.Register))
+        if (!inUse.Remove(r))
             throw new InvalidOperationException($"Register {r} not in use.");
-        Console.WriteLine($"Releasing register: {r}");
-        freeRegs.Push(r);
+        // Console.WriteLine($"Releasing register: {r}");
+
+        freeRegisters.Push(getMissingRegister(r));
+    }
+
+    private PhysicalRegister getMissingRegister(RegOperand operand)
+    {
+        PhysicalRegister[] registers = GetScratchRegisters(profile, convention).ToArray();
+        foreach (PhysicalRegister reg in registers)
+        {
+            if (reg.Name == operand.Register.Name)
+            {
+                return reg;
+            }
+        }
+        return null;
     }
 
     // peek (non-allocating) just for info/debug
-    public IEnumerable<RegOperand> Available() => freeRegs.ToArray();
+    public IEnumerable<RegOperand> Available()
+    {
+        List<RegOperand> result = new List<RegOperand>();
+        foreach (PhysicalRegister physical in freeRegisters.ToArray())
+        {
+            result.Add(new RegOperand(physical.GetInfo()));
+        }
+        return result;
+    }
+    public IEnumerable<PhysicalRegister> GetUnavailable()
+    {
+        List<PhysicalRegister> unAvailableRegisters = new List<PhysicalRegister>();
+        foreach (RegOperand info in inUse)
+        {
+            unAvailableRegisters.Add(getMissingRegister(info));
+        }
+        return unAvailableRegisters;
+    }
 }

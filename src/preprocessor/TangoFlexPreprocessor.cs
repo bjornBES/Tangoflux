@@ -1,4 +1,5 @@
 
+using System.ComponentModel;
 using System.Text;
 
 
@@ -8,133 +9,71 @@ public class TangoFlexPreprocessor
     public bool debug = true;
     public string debugFile = Path.GetFullPath(Path.Combine("debug", "preprocessor.tf"));
     public string Source;
-    private readonly string[] lines;
-
-    private List<string> includedFiles = new List<string>();
+    private string[] lines;
+    Arguments Arguments;
+    List<string> includeOnce = new List<string>();
+    string fileName;
     public TangoFlexPreprocessor(string sourceCode, Arguments arguments)
     {
+        Arguments = arguments;
         lines = sourceCode.Split('\n');
-        Source = Process(arguments);
-        lines = Source.Split('\n');
-        Source = ProcessIncludes(arguments);
-        lines = Source.Split('\n');
-        Source = Process(arguments);
-
-        if (debug)
+        Source = Process(arguments, lines);
+        fileName = arguments.InputFile;
+        if (debug && arguments.debug == true)
         {
             File.WriteAllText(debugFile, Source);
         }
     }
 
-    private string ProcessIncludes(Arguments arguments)
+    public string Process(string sourceCode, string file)
     {
-        StringBuilder output = new();
-        bool currentEnabled = true;
-
-        for (int i = 0; i < lines.Length; i++)
-        {
-            string line = lines[i].TrimStart();
-
-            if (line.StartsWith("#"))
-            {
-                line = HandleLineContinuation(i, ref i);
-
-                if (line.StartsWith("#namespace "))
-                {
-                    string ns = line[11..].Trim();
-                    // handle namespace logic later
-                }
-                else if (line.StartsWith("#import "))
-                {
-                    string importName = line[7..].Trim();
-                    // handle import logic later
-                }
-                else if (line.StartsWith("#include "))
-                {
-                    string libName = line[9..].Trim();
-                    string filePath = "";
-                    if (libName.StartsWith('<') && libName.EndsWith('>'))
-                    {
-                        string defaultPath = "lib"; // temp
-                        filePath = Path.Combine(defaultPath, libName.Substring(1, libName.Length - 2));
-                    }
-                    if (includedFiles.Contains(filePath))
-                    {
-                        continue;
-                    }
-                    string src = File.ReadAllText(filePath);
-                    if (src.Contains("#included once"))
-                    {
-                        includedFiles.Add(libName);
-                        src = src.Replace("#included once", "");
-                    }
-                    output.AppendLine(src);
-                }
-                else if (line.StartsWith("#included "))
-                {
-                    string libName = line[10..].Trim();
-                }
-                else
-                {
-                    output.AppendLine(lines[i]);
-                }
-
-                continue;
-            }
-
-            if (currentEnabled)
-                output.AppendLine(lines[i]);
-        }
-
-        return output.ToString();
+        fileName = file;
+        lines = sourceCode.Split('\n');
+        return Process(Arguments, lines);
     }
-
-    public string Process(Arguments arguments)
+    public string Process(Arguments arguments, string[] _lines)
     {
         StringBuilder output = new();
         bool currentEnabled = true;
+        // bool HasFile = lines.Contains($"#file {arguments.InputFile}", StringComparer.OrdinalIgnoreCase);
 
-        for (int i = 0; i < lines.Length; i++)
+        for (int i = 0; i < _lines.Length; i++)
         {
-            string line = lines[i].TrimStart();
+            string line = _lines[i].TrimStart();
 
             if (line.StartsWith("#"))
             {
-                line = HandleLineContinuation(i, ref i);
+                line = HandleLineContinuation(_lines, i, ref i);
 
-                if (line.StartsWith("#namespace "))
-                {
-                    string ns = line[11..].Trim();
-                    // handle namespace logic later
-                }
-                else if (line.StartsWith("#import "))
-                {
-                    string importName = line[7..].Trim();
-                    // handle import logic later
-                }
-                else if (line.StartsWith("#extension "))
+                if (line.StartsWith("#extension "))
                 {
                     string libName = line[11..].Trim();
                     output.AppendLine($"#include <{libName}.tf>");
                 }
+                else if (line.StartsWith("#included once"))
+                {
+                    includeOnce.Add(fileName);
+                }
                 else
                 {
-                    output.AppendLine(lines[i]);
+                    output.AppendLine(_lines[i]);
                 }
 
                 continue;
             }
 
             if (currentEnabled)
-                output.AppendLine(lines[i]);
+            {
+                output.AppendLine(_lines[i]);
+            }
         }
 
         return output.ToString();
     }
-    private string HandleLineContinuation(int index, ref int i)
+    private string HandleLineContinuation(string[] _lines, int index, ref int i)
     {
         StringBuilder builder = new();
-        string line = lines[i].TrimEnd();
+        string line = _lines[i].TrimEnd();
         builder.Append(line);
 
         while (line.EndsWith("\\"))

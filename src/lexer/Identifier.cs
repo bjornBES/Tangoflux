@@ -16,11 +16,17 @@ namespace CompilerTangoFlex.lexer
         public string Val { get; }
         public override string ToString()
         {
-            return $"({Line}:{Column}): " + Kind + ": " + Val;
+            return $"({File}:{Line}:{Column}): " + Kind + ": " + Val;
         }
         public override Token Clone()
         {
             return new TokenIdentifier(Val);
+        }
+
+
+        public override object GetData()
+        {
+            return Val;
         }
     }
 

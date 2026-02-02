@@ -1,0 +1,133 @@
+{
+    "cSpell.words": [
+        "ADDASSIGN",
+        "alignof",
+        "alnum",
+        "ANDASSIGN",
+        "Boollit",
+        "cdecl",
+        "cjump",
+        "cstring",
+        "cstrings",
+        "DIVASSIGN",
+        "elif",
+        "ENDFILE",
+        "Floatlit",
+        "fsachar",
+        "GTGT",
+        "ifdef",
+        "Intlit",
+        "jumpc",
+        "LEFTCURL",
+        "LEFTPAREN",
+        "LEFTSHIFT",
+        "LEFTSHIFTASSIGN",
+        "LTLT",
+        "memcpy",
+        "MODASSIGN",
+        "movsb",
+        "movsd",
+        "movsq",
+        "movsw",
+        "movzx",
+        "msvcrt",
+        "MULT",
+        "MULTASSIGN",
+        "ORASSIGN",
+        "PREELIF",
+        "PREELSE",
+        "PREENDFILE",
+        "PREENDIF",
+        "PREIF",
+        "PREIFDEF",
+        "PREIFNDEF",
+        "PREIMPORT",
+        "PREINCLUDE",
+        "PRENAMESPACE",
+        "PREUNDEF",
+        "RIGHTARROW",
+        "RIGHTCURL",
+        "RIGHTPAREN",
+        "RIGHTSHIFT",
+        "RIGHTSHIFTASSIGN",
+        "rodata",
+        "RSHIFTASSIGN",
+        "Sete",
+        "Setg",
+        "Setge",
+        "Setl",
+        "Setle",
+        "Setne",
+        "SOOO",
+        "Stringlit",
+        "strlit",
+        "SUBASSIGN",
+        "SXHH",
+        "syscall",
+        "systemcall",
+        "WINAPI",
+        "XORASSIGN"
+    ],
+    "multiCommand.commands": [
+        {
+            "command": "multiCommand.moveUp5",
+            "sequence": [
+                "cursorUp",
+                "cursorUp",
+                "cursorUp",
+                "cursorUp",
+                "cursorUp"
+            ]
+        },
+        {
+            "command": "multiCommand.moveDown5",
+            "sequence": [
+                "cursorDown",
+                "cursorDown",
+                "cursorDown",
+                "cursorDown",
+                "cursorDown"
+            ]
+        },
+        {
+            "command": "multiCommand.wordRight5",
+            "sequence": [
+                "cursorWordRight",
+                "cursorWordRight",
+                "cursorWordRight",
+                "cursorWordRight",
+                "cursorWordRight"
+            ]
+        }
+
+    ],
+    "vscode-neovim.highlightGroups.highlights": {
+        
+
+        "IncSearch": {
+            "backgroundColor": "theme.editor.findMatchBackground"
+        },
+        "CurSearch": {
+            "backgroundColor": "theme.editor.findMatchBackground"
+        },
+        "Search": {
+            "backgroundColor": "theme.editor.findMatchHighlightBackground"
+        },
+        "Substitute": {
+            "backgroundColor": "theme.editor.foreground",
+            "color": "theme.editor.background"
+        }
+    },
+    "vscode-neovim.neovimExecutablePaths.linux": "/usr/bin/nvim",
+    "vscode-neovim.compositeKeys": {
+
+    },
+    "files.exclude": {
+        "**/.git": true,
+        "**/.svn": true,
+        "**/.hg": true,
+        "**/.DS_Store": true,
+        "**/Thumbs.db": true
+    },
+    "explorerExclude.backup": {},
+}

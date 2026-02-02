@@ -5,7 +5,9 @@ public enum SectionStatus
 {
     NONE,
     TEXT,
-    DATA
+    DATA,
+    RODATA,
+    BSS,
 }
 
 public class TFAsmGen
@@ -14,10 +16,12 @@ public class TFAsmGen
     SectionStatus status = SectionStatus.NONE;
     private FunctionFrame currentFrame;
     private RegisterTracker currentRegisterTracker;
+    public ScratchRegisterAllocator RegisterAllocator;
 
-    public TFAsmGen(ICallingConvention callingConvention)
+    public TFAsmGen(ICallingConvention callingConvention, ScratchRegisterAllocator scratchRegister)
     {
         CallingConvention = callingConvention;
+        RegisterAllocator = scratchRegister;
     }
 
     public string Text()
@@ -39,8 +43,26 @@ public class TFAsmGen
         }
         return "";
     }
+    public string Rodata()
+    {
+        if (status != SectionStatus.RODATA)
+        {
+            status = SectionStatus.RODATA;
+            return ".rodata";
+        }
+        return "";
+    }
+    public string Bss()
+    {
+        if (status != SectionStatus.BSS)
+        {
+            status = SectionStatus.BSS;
+            return ".bss";
+        }
+        return "";
+    }
 
-    public string Globl(string name) => $".global {name}";
+    public string Global(string name) => $".global {name}";
     public string Local(string name) => $".local {name}";
     public string Align(int align) => $".align {align}";
     public string Comm(string name, int size, int align) => $".comm {name},{size},{align}";
@@ -50,23 +72,23 @@ public class TFAsmGen
     public string Long(int value) => $".qword {value}";
     public string Comment(string comment) => $"    ; {comment}";
 
-    public FunctionFrame EnterFunction(string name, int locals, ICallingConvention conv, RegisterProfile profile)
+    public FunctionFrame EnterFunction(string name, int locals, ICallingConvention convention, RegisterProfile profile)
     {
         FunctionFrame frame = new FunctionFrame
         {
             FunctionName = name,
             LocalSize = locals,
-            StackAlignment = conv.StackAlignment,
+            StackAlignment = convention.Stack.Alignment,
             UseFramePointer = true // or decide later
         };
 
         currentFrame = frame;
-        currentRegisterTracker = new RegisterTracker(frame, conv, profile);
+        currentRegisterTracker = new RegisterTracker(frame, convention, profile);
 
         return frame;
     }
 
-    public string LeaveFunction(string name, int locals, ICallingConvention conv, RegisterProfile profile)
+    public string LeaveFunction(string name, int locals, ICallingConvention convention, RegisterProfile profile)
     {
         FunctionFrame functionFrame = new FunctionFrame()
         {
@@ -77,21 +99,37 @@ public class TFAsmGen
         };
         functionFrame.CalleeSavedUsed.Add(new RegisterInfo("rbx", 0));
         functionFrame.CalleeSavedUsed.Add(new RegisterInfo("r12", 12));
-        return PrologueEpilogueGenerator.GenerateEpilogue(functionFrame, conv, profile);
+        return PrologueEpilogueGenerator.GenerateEpilogue(functionFrame, convention, profile);
     }
 
-    public string Move(AsmOperand dst, AsmOperand src, bool longMove = false)
+    public string Move(AsmOperand dst, AsmOperand src, int forceSize = -1)
     {
         if (dst is RegOperand r)
         {
             currentRegisterTracker.Use(r.Register);
         }
 
+        // MemOperand, MemOperand
+        // RegOperand, RegOperand
+        // MemOperand, PtrOperand
+        // MemOperand, AsmOperand
+        // [rel LabelOperand], AsmOperand
+        // AsmOperand, [rel LabelOperand]
+        // AsmOperand, ImmOperand.ToStringWithoutPrefix()
+
         if (src is MemOperand srcMem && dst is MemOperand dstMem)
         {
-            RegOperand srcReg = new RegOperand(CallingConvention.GetRegister(RegisterFunction.GeneralPurpose)).GetRegisterOpBySize(dstMem.Size);
-            return $"    mov {srcReg}, {srcMem}{Environment.NewLine}" +
+            RegOperand tempReg = RegisterAllocator.Allocate();
+            if (tempReg == null)
+            {
+                throw new InvalidOperationException("");
+            }
+            currentRegisterTracker.Use(tempReg.Register);
+            RegOperand srcReg = new RegOperand(tempReg.Register).GetRegisterOpBySize(dstMem.Size);
+            string code = $"    mov {srcReg}, {srcMem}{Environment.NewLine}" +
                    $"    mov {dstMem}, {srcReg}";
+            RegisterAllocator.Release(tempReg);
+            return code;
         }
         if (dst is RegOperand reg && src is ImmOperand imm1)
         {
@@ -105,29 +143,36 @@ public class TFAsmGen
         {
             return $"    mov {mem}, {imm2.ToStringWithoutPrefix()}";
         }
-        else if (dst is MemOperand mem1 && src is RegOperand r1)
-        {
-            return $"    mov {mem1}, {r1}";
-        }
         else if (dst is RegOperand dstReg && src is RegOperand srcReg)
         {
+            // check if they are the same register
+            if (dstReg.GetRegisterOpBySize(8).Register == srcReg.GetRegisterOpBySize(8).Register)
+            {
+                int dstRegSize = dstReg.GetSize();
+                int srcRegSize = srcReg.GetSize();
+                if (srcRegSize < dstRegSize)
+                {
+                    // TODO: add signed
+                    if (srcRegSize == 32 && dstRegSize == 64)
+                    {
+                        return $"    mov {dstReg}, {srcReg}";
+                    }
+                    return $"    movzx {dstReg}, {srcReg}";
+                }
+            }
             return $"    mov {dstReg}, {srcReg.GetRegisterBySize(dstReg.GetSize())}";
-        }
-        else if (dst is RegOperand reg2 && src is PtrOperand srcPtr)
-        {
-            return $"    mov {reg2}, {srcPtr}";
         }
         else if (dst is MemOperand mem4 && src is PtrOperand srcPtr1)
         {
             return $"    mov {mem4}, qword {srcPtr1}";
         }
-        else if (src is MemOperand mem2)
-        {
-            return $"    mov {dst}, {mem2}";
-        }
         else if (dst is MemOperand mem3)
         {
             return $"    mov {mem3.ToStringWithoutPrefix()}, {src}";
+        }
+        else if (dst.IsType(out LabelOperand label))
+        {
+            return $"    mov {label.ToStringWithPrefix()}, {src}";
         }
 
         return $"    mov {dst}, {src}";
@@ -135,6 +180,11 @@ public class TFAsmGen
 
     public string Lea(AsmOperand dst, AsmOperand src)
     {
+        RegOperand reg;
+        if (src.IsType(out reg))
+        {
+            return $"    lea {dst}, [{reg}]";
+        }
         return $"    lea {dst}, {src}";
     }
 
@@ -210,7 +260,15 @@ public class TFAsmGen
         {
             return "   ; Invalid operand for sub";
         }
-        if (src is ImmOperand _ or MemOperand)
+        
+        RegOperand reg;
+        ImmOperand imm;
+
+        if (src.IsType(out imm) && dst.IsType(out reg))
+        {
+            return $"    sub {reg}, {reg.GetPrefix(reg.GetSize())} {imm.ToStringWithoutPrefix()}";
+        }
+        else if (src is MemOperand)
         {
             return $"    sub {dst}, qword {src}";
         }
@@ -219,8 +277,8 @@ public class TFAsmGen
 
     public string Mul(AsmOperand src)
     {
-        currentRegisterTracker.Use(CallingConvention.GetRegister(RegisterFunction.MultiplyResultLow));
-        currentRegisterTracker.Use(CallingConvention.GetRegister(RegisterFunction.MultiplyResultHigh));
+        currentRegisterTracker.Use(CallingConvention.GetRegister(RegisterRole.MultiplyResultLow, "Multiply not supported on this target"));
+        currentRegisterTracker.Use(CallingConvention.GetRegister(RegisterRole.MultiplyResultHigh, "Multiply not supported on this target"));
 
         if (src is RegOperand r)
         {
@@ -231,8 +289,8 @@ public class TFAsmGen
     }
     public string Div(AsmOperand src)
     {
-        currentRegisterTracker.Use(CallingConvention.GetRegister(RegisterFunction.DivideDividendLow));
-        currentRegisterTracker.Use(CallingConvention.GetRegister(RegisterFunction.DivideDividendHigh));
+        currentRegisterTracker.Use(CallingConvention.GetRegister(RegisterRole.DivideDividendLow, "Divide"));
+        currentRegisterTracker.Use(CallingConvention.GetRegister(RegisterRole.DivideDividendHigh, "Divide"));
 
         if (src is RegOperand r)
         {
@@ -277,6 +335,24 @@ public class TFAsmGen
         }
         return "   ; Invalid operand for setge";
     }
+    public string Setl(AsmOperand dst)
+    {
+        if (dst is RegOperand r)
+        {
+            currentRegisterTracker.Use(r.Register);
+            return $"    setl {r.GetByte()}";
+        }
+        return "   ; Invalid operand for setle";
+    }
+    public string Setg(AsmOperand dst)
+    {
+        if (dst is RegOperand r)
+        {
+            currentRegisterTracker.Use(r.Register);
+            return $"    setg {r.GetByte()}";
+        }
+        return "   ; Invalid operand for setge";
+    }
 
     public string Push(AsmOperand src)
     {
@@ -294,9 +370,9 @@ public class TFAsmGen
         {
 
         }
-        else if (src is LableOperand lable)
+        else if (src is LabelOperand label)
         {
-            address = lable.ToString();
+            address = label.ToString();
         }
 
         return $"    jmp {address}";
@@ -313,9 +389,9 @@ public class TFAsmGen
         {
 
         }
-        else if (src is LableOperand lable)
+        else if (src is LabelOperand label)
         {
-            address = lable.ToString();
+            address = label.ToString();
         }
 
         return $"    je {address}";
@@ -332,9 +408,9 @@ public class TFAsmGen
         {
 
         }
-        else if (src is LableOperand lable)
+        else if (src is LabelOperand label)
         {
-            address = lable.ToString();
+            address = label.ToString();
         }
 
         return $"    jne {address}";
@@ -350,9 +426,9 @@ public class TFAsmGen
         {
 
         }
-        else if (src is LableOperand lable)
+        else if (src is LabelOperand label)
         {
-            address = lable.ToString();
+            address = label.ToString();
         }
 
         return $"    jz {address}";
@@ -368,12 +444,34 @@ public class TFAsmGen
         {
 
         }
-        else if (src is LableOperand lable)
+        else if (src is LabelOperand label)
         {
-            address = lable.ToString();
+            address = label.ToString();
         }
 
         return $"    jnz {address}";
+    }
+
+    public string SystemCall(AsmOperand intNumber)
+    {
+        if (!CallingConvention.TryGetRole(RegisterRole.SyscallNumber, out PhysicalRegister intNumberReg))
+        {
+            
+        }
+        if (RegisterAllocator.GetUnavailable().Contains(intNumberReg))
+        {
+            RegisterAllocator.Release(new RegOperand(intNumberReg.GetInfo()));
+        }
+        string lines = Move(new RegOperand(intNumberReg.GetInfo()), intNumber) + Environment.NewLine;
+        currentRegisterTracker.Use(intNumberReg.GetInfo());
+        // TODO: change for other arch/OS
+        lines += "    syscall";
+        return lines;
+    }
+
+    public string Call(AsmOperand dst)
+    {
+        return $"    call {dst}";
     }
 
     public string Label(string name)

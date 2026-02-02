@@ -25,7 +25,7 @@ namespace CompilerTangoFlex.lexer {
         public FloatSuffix Suffix { get; }
 
         public override string ToString() {
-            string str = $"({Line}:{Column}): " + Kind.ToString();
+            string str = $"({File}:{Line}:{Column}): " + Kind.ToString();
             switch (Suffix) {
                 case FloatSuffix.F:
                     str += "(float)";
@@ -42,6 +42,12 @@ namespace CompilerTangoFlex.lexer {
         public override Token Clone()
         {
             return new TokenFloat(Val, Suffix, Raw);
+        }
+
+
+        public override object GetData()
+        {
+            return Raw;
         }
     }
 

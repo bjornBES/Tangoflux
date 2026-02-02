@@ -1,8 +1,8 @@
-// need an inculde preprocess thing
+// need an include preprocess thing
 
 extern func FuncOutsideHere() : void
 
-func OtherFuncs(first : uint8, _2nd : uint8) : void {
+func OtherFunctions(first : uint8, _2nd : uint8) : void {
 
 }
 
@@ -10,7 +10,7 @@ func OtherFuncs(first : uint8, _2nd : uint8) : void {
 
 var ConstValue : const int = 0x55AA
 
-// structs are costom types to the type system
+// structs are custom types to the type system
 struct uint24 {
     var value : uint8[3]
 }
@@ -30,7 +30,7 @@ func main(argc : int32, argv : string ptr) : int {
         framebuffer[i] = 0
     }
 
-    SomeOtherFunc = ptr OtherFuncs
+    SomeOtherFunc = ptr OtherFunctions
     SomeOtherFunc(1, 2)
 
     var newFunc : int ptr (uint8) = ptr 0x1000_0000
@@ -50,4 +50,20 @@ func main(argc : int32, argv : string ptr) : int {
 
     // you can't do
     var ThisWouldGiveAnError : SomeOtherStruct = 1  // error
+
+    var str : string at {
+        value = "Hello world"
+        length = @sizeof("Hello world")
+    }
+    // reads like
+    var str
+    // new variable called str
+    string at {
+
+    }
+    // in the struct string at
+    value = "Hello world"
+    // at value set to "Hello world"
+    length
+    // at length set to @sizeof("Hello world")
 }

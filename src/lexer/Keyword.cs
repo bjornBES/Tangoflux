@@ -132,7 +132,14 @@ namespace CompilerTangoFlex.lexer
 
         public override string ToString()
         {
-            return $"({Line}:{Column}): " + Kind + ": " + Val;
+            return $"({File}:{Line}:{Column}): " + Kind + ": " + Val;
+        }
+
+
+        public override object GetData()
+        {
+            int valueIndex = Keywords.Values.ToList().IndexOf(Val);
+            return Keywords.Keys.ElementAt(valueIndex).ToString();
         }
 
     }

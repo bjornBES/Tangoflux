@@ -29,8 +29,8 @@ struct TokenList {
 }
 
 var charIndex : int
-var source : string ptr // NULL by defualt
-var keywordList : cstring ptr // NULL by defualt
+var source : string ptr // NULL by default
+var keywordList : cstring ptr // NULL by default
 var keywordCount : int
 
 func token_list_init(list : TokenList ptr, arena : Arena ptr, cap : uint32) : void {

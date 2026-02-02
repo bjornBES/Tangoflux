@@ -1,6 +1,21 @@
 public interface ICallingConvention
 {
-    public int StackAlignment { get; set; }
-    RegisterInfo GetRegister(RegisterFunction function);
-    string GetRegisterName(RegisterInfo register);
+    string Name { get; }
+
+    StackPolicy Stack { get; }
+
+    bool SupportsRipRelative { get; }
+
+    IReadOnlyList<ArgumentRule> ArgumentRegisters { get; }
+    IReadOnlyList<PhysicalRegister> ScratchRegisters { get; }
+    IReadOnlyList<PhysicalRegister> CalleeSavedRegisters { get; }
+    IReadOnlyList<PhysicalRegister> AddressScratchRegisters { get; }
+    IReadOnlyList<PhysicalRegister> AddressCalleeSavedRegisters { get; }
+
+
+    bool TryGetRole(RegisterRole role, out PhysicalRegister register);
+    bool TryGetRole(RegisterRole role, out RegisterInfo register);
+    RegisterInfo GetRegister(RegisterRole role, string msg);
+    string EmitCall(TFAsmGen emitter, AsmOperand symbol, IReadOnlyList<AsmOperand> args);
+    string EmitSyscall(TFAsmGen emitter, AsmOperand symbol, IReadOnlyList<AsmOperand> args);
 }

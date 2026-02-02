@@ -35,7 +35,7 @@ public sealed class MemOperand : AsmOperand
         return $"{SizePrefix()} [{Base.Name}{(Offset > 0 ? "+" : "")}{Offset}]";
     }
 
-    string SizePrefix()
+    public string SizePrefix()
     {
         switch (Size)
         {

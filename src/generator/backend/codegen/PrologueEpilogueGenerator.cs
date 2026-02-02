@@ -10,30 +10,30 @@ public static class PrologueEpilogueGenerator
     /// <summary>
     /// Generate the prologue assembly lines for the given frame and convention.
     /// </summary>
-    public static string GeneratePrologue(FunctionFrame frame, ICallingConvention conv, RegisterProfile profile)
+    public static string GeneratePrologue(FunctionFrame frame, ICallingConvention convention, RegisterProfile profile)
     {
-        var lines = new List<string>();
+        List<string> lines = new List<string>();
         // nice label
         lines.Add($"global {frame.FunctionName}:");
         lines.Add($"{frame.FunctionName}:");
 
         // choose per-profile callee-saved default order (push order). We will push only those the function uses.
-        var defaultCalleeSaved = GetDefaultCalleeSaved(profile, conv);
+        List<RegisterInfo> defaultCalleeSaved = GetDefaultCalleeSaved(profile, convention);
 
         // intersection in the default order
-        var toSave = defaultCalleeSaved.Where(r => frame.CalleeSavedUsed.Any(u => u.Name == r.Name)).ToList();
+        List<RegisterInfo> toSave = defaultCalleeSaved.Where(r => frame.CalleeSavedUsed.Any(u => u.Name == r.Name)).ToList();
 
         // If using frame pointer for this ABI: push old fp and set new fp
-        if (frame.UseFramePointer && FramePointerRegister(conv, profile) is RegisterInfo fp)
+        if (frame.UseFramePointer && FramePointerRegister(convention, profile) is RegisterInfo fp)
         {
             // push FP (common pattern: push rbp; mov rbp,rsp)
-            lines.Add($"    push {conv.GetRegisterName(fp)}");
-            lines.Add($"    mov {conv.GetRegisterName(fp)}, rsp"); // x86: mov rbp, rsp ; ARM would be different
+            lines.Add($"    push {fp.Name}");
+            lines.Add($"    mov {fp.Name}, rsp"); // x86: mov rbp, rsp ; ARM would be different
         }
 
         // push callee-saved registers (order: as listed). Some ABIs push after setting fp like GCC does.
-        foreach (var r in toSave)
-            lines.Add($"    push {conv.GetRegisterName(r)}");
+        foreach (RegisterInfo r in toSave)
+            lines.Add($"    push {r.Name}");
 
         // compute total stack space needed for locals + red zone / saved registers padding
         int savedCount = toSave.Count;
@@ -43,7 +43,7 @@ public static class PrologueEpilogueGenerator
 
         // If we didn't create FP, savedBytes might be different (fp pushed too if used)
         // Note: if FP is pushed above, that was another push accounted for implicitly by being pushed prior; we accounted separately with FramePointerRegister push.
-        // But for stack adjustment compute only local space (we already pushed saved regs).
+        // But for stack adjustment compute only local space (we already pushed saved registers).
         int locals = frame.LocalSize;
 
         // Align total stack change so that (rsp after prologue) % alignment == 0
@@ -51,7 +51,7 @@ public static class PrologueEpilogueGenerator
         // We must ensure that when making a call, rsp is aligned. Simpler approach:
         // compute padding = (alignment - (locals % alignment)) % alignment
         int alignment = Math.Max(frame.StackAlignment, PointerSize(profile));
-        int padding = ((alignment - (locals % alignment)) % alignment);
+        int padding = (alignment - (locals % alignment)) % alignment;
         int totalSub = locals + padding;
 
         if (totalSub > 0)
@@ -78,15 +78,15 @@ public static class PrologueEpilogueGenerator
     }
 
     /// <summary>
-    /// Generate the epilogue for the given frame & conv.
+    /// Generate the epilogue for the given frame & convention.
     /// </summary>
-    public static string GenerateEpilogue(FunctionFrame frame, ICallingConvention conv, RegisterProfile profile)
+    public static string GenerateEpilogue(FunctionFrame frame, ICallingConvention convention, RegisterProfile profile)
     {
-        var lines = new List<string>();
+        List<string> lines = new List<string>();
 
         // Build list of callee-saved registers preserved earlier, in reverse order for popping
-        var defaultCalleeSaved = GetDefaultCalleeSaved(profile, conv);
-        var toSave = defaultCalleeSaved.Where(r => frame.CalleeSavedUsed.Any(u => u.Name == r.Name)).ToList();
+        List<RegisterInfo> defaultCalleeSaved = GetDefaultCalleeSaved(profile, convention);
+        List<RegisterInfo> toSave = defaultCalleeSaved.Where(r => frame.CalleeSavedUsed.Any(u => u.Name == r.Name)).ToList();
 
         int pointerSize = PointerSize(profile);
         int locals = frame.LocalSize;
@@ -112,14 +112,14 @@ public static class PrologueEpilogueGenerator
         }
 
         // Pop callee-saved in reverse of pushes
-        foreach (var r in Enumerable.Reverse(toSave))
-            lines.Add($"    pop {conv.GetRegisterName(r)}");
+        foreach (RegisterInfo r in Enumerable.Reverse(toSave))
+            lines.Add($"    pop {r.Name}");
 
         // Restore frame pointer if we set it
-        if (frame.UseFramePointer && FramePointerRegister(conv, profile) is RegisterInfo fp)
+        if (frame.UseFramePointer && FramePointerRegister(convention, profile) is RegisterInfo fp)
         {
             // pop fp; ret
-            lines.Add($"    pop {conv.GetRegisterName(fp)}");
+            lines.Add($"    pop {fp.Name}");
         }
 
         // exit instruction (ABI dependent)
@@ -152,50 +152,14 @@ public static class PrologueEpilogueGenerator
     /// Default callee-saved set and preferred order for pushing (matching common ABIs).
     /// Order matters: push sequence -> pop reversed in epilogue.
     /// </summary>
-    private static List<RegisterInfo> GetDefaultCalleeSaved(RegisterProfile profile, ICallingConvention conv)
+    private static List<RegisterInfo> GetDefaultCalleeSaved(RegisterProfile profile, ICallingConvention convention)
     {
-        switch (profile)
+        List<RegisterInfo> registers = new List<RegisterInfo>();
+        foreach (var item in convention.CalleeSavedRegisters)
         {
-            case RegisterProfile.X86_64_SysV:
-                // order: rbx, r12, r13, r14, r15  (common GCC/clang saving order after rbp)
-                return new List<RegisterInfo>
-                    {
-                        new RegisterInfo("rbx", 0),
-                        new RegisterInfo("r12", 12),
-                        new RegisterInfo("r13", 13),
-                        new RegisterInfo("r14", 14),
-                        new RegisterInfo("r15", 15),
-                    };
-
-            case RegisterProfile.X86_32_Cdecl:
-                return new List<RegisterInfo>
-                    {
-                        new RegisterInfo("ebx", 0),
-                        new RegisterInfo("esi", 1),
-                        new RegisterInfo("edi", 2),
-                    };
-
-            case RegisterProfile.ARM64_Linux:
-                // ARM64 callee-saved x19..x29 (x29 is fp) typically saved. We return an empty list for skeleton;
-                // generator will respond to frame.CalleeSavedUsed when ARM backend implements full register objects.
-                return new List<RegisterInfo>
-                    {
-                        new RegisterInfo("x19", 19),
-                        new RegisterInfo("x20", 20),
-                        new RegisterInfo("x21", 21),
-                        new RegisterInfo("x22", 22),
-                        new RegisterInfo("x23", 23),
-                        new RegisterInfo("x24", 24),
-                        new RegisterInfo("x25", 25),
-                        new RegisterInfo("x26", 26),
-                        new RegisterInfo("x27", 27),
-                        new RegisterInfo("x28", 28),
-                        new RegisterInfo("x29", 29), // fp
-                    };
-
-            default:
-                return new List<RegisterInfo>();
+            registers.Add(item.GetInfo());
         }
+        return registers;
     }
 
     private static int PointerSize(RegisterProfile profile)
@@ -213,7 +177,7 @@ public static class PrologueEpilogueGenerator
         }
     }
 
-    private static RegisterInfo FramePointerRegister(ICallingConvention conv, RegisterProfile profile)
+    private static RegisterInfo FramePointerRegister(ICallingConvention convention, RegisterProfile profile)
     {
         // attempt to ask convention by symbolic name if implemented, otherwise fallback
         switch (profile)

@@ -13,7 +13,7 @@ public class FunctionFrame
     public List<RegisterInfo> CalleeSavedUsed { get; } = new List<RegisterInfo>();
     /// <summary>Stack alignment in bytes required by the ABI (typically 16 for x86-64 SysV, 4/16 for others).</summary>
     public int StackAlignment { get; set; } = 16;
-    /// <summary>If true, function is leaf (no calls) so caller-saved could sometimes be reused; generator doesn't currently optimize for leafness except frame-pointer omission.</summary>
+    /// <summary>If true, function is leaf (no calls) so caller-saved could sometimes be reused; generator doesn't currently optimize for leaf-ness except frame-pointer omission.</summary>
     public bool IsLeaf { get; set; } = false;
 
     // Registers touched by this function (any usage)

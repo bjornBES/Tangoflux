@@ -12,15 +12,16 @@ namespace CompilerTangoFlex.lexer
     {
         LBRACKET,
         RBRACKET,
-        LPAREN,
-        RPAREN,
+        LEFTPAREN,
+        RIGHTPAREN,
         PERIOD,
         COMMA,
         QUESTION,
         COLON,
         TILDE,
         SUB,
-        RARROW,
+        // >
+        RIGHTARROW,
         DEC,
         SUBASSIGN,
         ADD,
@@ -33,12 +34,12 @@ namespace CompilerTangoFlex.lexer
         MULTASSIGN,
         LT,
         LEQ,
-        LSHIFT,
-        LSHIFTASSIGN,
+        LEFTSHIFT,
+        LEFTSHIFTASSIGN,
         GT,
         GEQ,
-        RSHIFT,
-        RSHIFTASSIGN,
+        RIGHTSHIFT,
+        RIGHTSHIFTASSIGN,
         ASSIGN,
         EQ,
         BITOR,
@@ -53,8 +54,8 @@ namespace CompilerTangoFlex.lexer
         XOR,
         XORASSIGN,
         SEMICOLON,
-        LCURL,
-        RCURL,
+        LEFTCURL,
+        RIGHTCURL,
         HASH,
         INTRINSICS
     }
@@ -72,15 +73,15 @@ namespace CompilerTangoFlex.lexer
         public static Dictionary<string, OperatorVal> Operators { get; } = new Dictionary<string, OperatorVal> {
             { "[",    OperatorVal.LBRACKET     },
             { "]",    OperatorVal.RBRACKET     },
-            { "(",    OperatorVal.LPAREN       },
-            { ")",    OperatorVal.RPAREN       },
+            { "(",    OperatorVal.LEFTPAREN    },
+            { ")",    OperatorVal.RIGHTPAREN   },
             { ".",    OperatorVal.PERIOD       },
             { ",",    OperatorVal.COMMA        },
             { "?",    OperatorVal.QUESTION     },
             { ":",    OperatorVal.COLON        },
             { "~",    OperatorVal.TILDE        },
             { "-",    OperatorVal.SUB          },
-            { "->",   OperatorVal.RARROW       },
+            { "->",   OperatorVal.RIGHTARROW   },
             { "--",   OperatorVal.DEC          },
             { "-=",   OperatorVal.SUBASSIGN    },
             { "+",    OperatorVal.ADD          },
@@ -93,12 +94,12 @@ namespace CompilerTangoFlex.lexer
             { "*=",   OperatorVal.MULTASSIGN   },
             { "<",    OperatorVal.LT           },
             { "<=",   OperatorVal.LEQ          },
-            { "<<",   OperatorVal.LSHIFT       },
-            { "<<=",  OperatorVal.LSHIFTASSIGN },
+            { "<<",   OperatorVal.LEFTSHIFT       },
+            { "<<=",  OperatorVal.LEFTSHIFTASSIGN },
             { ">",    OperatorVal.GT           },
             { ">=",   OperatorVal.GEQ          },
-            { ">>",   OperatorVal.RSHIFT       },
-            { ">>=",  OperatorVal.RSHIFTASSIGN },
+            { ">>",   OperatorVal.RIGHTSHIFT       },
+            { ">>=",  OperatorVal.RIGHTSHIFTASSIGN },
             { "=",    OperatorVal.ASSIGN       },
             { "==",   OperatorVal.EQ           },
             { "|",    OperatorVal.BITOR        },
@@ -113,16 +114,15 @@ namespace CompilerTangoFlex.lexer
             { "^",    OperatorVal.XOR          },
             { "^=",   OperatorVal.XORASSIGN    },
             { ";",    OperatorVal.SEMICOLON    },
-            { "{",    OperatorVal.LCURL        },
-            { "}",    OperatorVal.RCURL        },
-            { "AS",   OperatorVal.ASSIGN       },
+            { "{",    OperatorVal.LEFTCURL        },
+            { "}",    OperatorVal.RIGHTCURL        },
             { "#",    OperatorVal.HASH         },
             { "@",    OperatorVal.INTRINSICS   },
         };
 
         public override string ToString()
         {
-            return $"({Line}:{Column}): " + Kind + " [" + Val + "]: " + Operators.First(pair => pair.Value == Val).Key;
+            return $"({File}:{Line}:{Column}): " + Kind + " [" + Val + "]: " + Operators.First(pair => pair.Value == Val).Key;
         }
 
         public override Token Clone()
@@ -130,7 +130,13 @@ namespace CompilerTangoFlex.lexer
             return new TokenOperator(Val);
         }
 
-        public int binPrec()
+        public override object GetData()
+        {
+            int valueIndex = Operators.Values.ToList().IndexOf(Val);
+            return Operators.Keys.ElementAt(valueIndex).ToString();
+        }
+
+        public int binPrecedence()
         {
             switch (Val)
             {
@@ -175,8 +181,8 @@ namespace CompilerTangoFlex.lexer
                 case OperatorVal.ANDASSIGN:
                 case OperatorVal.ORASSIGN:
                 case OperatorVal.XORASSIGN:
-                case OperatorVal.LSHIFTASSIGN:
-                case OperatorVal.RSHIFTASSIGN:
+                case OperatorVal.LEFTSHIFTASSIGN:
+                case OperatorVal.RIGHTSHIFTASSIGN:
                     return true;
                 default:
                     return false;
@@ -203,10 +209,10 @@ namespace CompilerTangoFlex.lexer
                     return OperatorVal.BITOR;
                 case OperatorVal.XORASSIGN:
                     return OperatorVal.XOR;
-                case OperatorVal.LSHIFTASSIGN:
-                    return OperatorVal.LSHIFT;
-                case OperatorVal.RSHIFTASSIGN:
-                    return OperatorVal.RSHIFT;
+                case OperatorVal.LEFTSHIFTASSIGN:
+                    return OperatorVal.LEFTSHIFT;
+                case OperatorVal.RIGHTSHIFTASSIGN:
+                    return OperatorVal.RIGHTSHIFT;
                 default:
                     throw new Exception("Not a compound assignment operator");
             }
@@ -279,7 +285,7 @@ namespace CompilerTangoFlex.lexer
             );
 
         private State _state;
-        private string _scanned;
+        public string _scanned;
 
         public FSAOperator()
         {
@@ -303,6 +309,8 @@ namespace CompilerTangoFlex.lexer
                     return FSAStatus.END;
                 case State.ERROR:
                     return FSAStatus.ERROR;
+                case State.FINISH:
+                    return FSAStatus.FINISH;
                 default:
                     return FSAStatus.RUNNING;
             }
@@ -310,6 +318,10 @@ namespace CompilerTangoFlex.lexer
 
         public override sealed Token RetrieveToken()
         {
+            if (TokenOperator.Operators.ContainsKey(_scanned))
+            {
+                return new TokenOperator(TokenOperator.Operators[_scanned]);
+            }
             return new TokenOperator(TokenOperator.Operators[_scanned.Substring(0, _scanned.Length - 1)]);
         }
 

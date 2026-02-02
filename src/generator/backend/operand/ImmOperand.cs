@@ -1,5 +1,6 @@
 public sealed class ImmOperand : AsmOperand
 {
+    public IrType Type{ get; set; }
     public long Value;
 
     public ImmOperand(long value)
@@ -58,37 +59,43 @@ public sealed class ImmOperand : AsmOperand
 
     public string ToStringWithoutPrefix()
     {
-        return $"{Value}";
+        long intValue = Convert.ToInt64(Value);
+        return $"0x{Convert.ToString(intValue, 16)}";
     }
 
     public override string ToString()
     {
         if (Value <= byte.MaxValue && Value >= byte.MinValue)
         {
-            return $"byte {Value}";
+            sbyte intValue = Convert.ToSByte(Value);
+            return $"byte 0x{Convert.ToString(intValue, 16)}";
         }
         else if (Value <= ushort.MaxValue && Value >= ushort.MinValue)
         {
-            return $"word {Value}";
+            short intValue = Convert.ToInt16(Value);
+            return $"word 0x{Convert.ToString(intValue, 16)}";
         }
         else if (Value <= uint.MaxValue && Value >= uint.MinValue)
         {
-            return $"dword {Value}";
+            int intValue = Convert.ToInt32(Value);
+            return $"dword 0x{Convert.ToString(intValue, 16)}";
         }
         else
         {
-            return $"qword {Value}";
+            long intValue = Convert.ToInt64(Value);
+            return $"qword 0x{Convert.ToString(intValue, 16)}";
         }
     }
 
     public string ToStringFromSize(int size)
     {
+        long intValue = Convert.ToInt64(Value);
         switch (size)
         {
-            case 1: return $"byte {Value}";
-            case 2: return $"word {Value}";
-            case 4: return $"dword {Value}";
-            case 8: return $"qword {Value}";
+            case 1: return $"byte 0x{Convert.ToString(intValue & 0xFF, 16)}";
+            case 2: return $"word 0x{Convert.ToString(intValue & 0xFFFF, 16)}";
+            case 4: return $"dword 0x{Convert.ToString(intValue & 0xFFFFFFFF, 16)}";
+            case 8: return $"qword 0x{Convert.ToString(intValue, 16)}";
             default: throw new Exception("invalid size");
         }
     }

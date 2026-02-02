@@ -11,10 +11,12 @@ using System.Text.Json.Serialization;
 [JsonDerivedType(typeof(NodeExprFieldAccess), "NodeExprFieldAccess")]
 [JsonDerivedType(typeof(NodeExprAddressOf), "NodeExprAddressOf")]
 [JsonDerivedType(typeof(NodeExprCast), "NodeExprCast")]
+[JsonDerivedType(typeof(NodeExprIntrinsic), "NodeExprIntrinsic")]
+[JsonDerivedType(typeof(NodeExprSystemcall), "NodeExprSystemcall")]
 [JsonDerivedType(typeof(NodeExpr), "NodeExpr")]
-public interface IExpr
+public abstract class IExpr
 {
-
+public SourceSpan SourceSpan{ get; set; }
 }
 public class NodeExpr : IExpr
 {

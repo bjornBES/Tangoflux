@@ -1,6 +1,9 @@
 ﻿using System.ComponentModel;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using BjornBEs.Libs.EasyArgs;
 using CompilerTangoFlex.lexer;
+using TangoFlex.preprocessor;
 
 public enum CallingConventions
 {
@@ -22,13 +25,14 @@ public class Arguments
     // [Arg("-i", "", Help = "Input file", Category = "", Required = true)]
     [Positional(0, Required = true, Help = "")]
     public string InputFile { get; set; }
-    [Arg("-o", "", Required = true)]
+    [Arg("-o", "")]
     [ArgAttributeHelp("Place the output into the file", "", HelpPlaceholder = "<file>")]
+    [DefaultValue("./out")]
     public string OutputFile { get; set; }
 
     [DefaultValue(CallingConventions.SysV)]
     [Arg("", "--cc", AllowedValues = ["SysV", "cdecl", "stdcall", "fastcall"])]
-    [ArgAttributeHelp("Select calling convention", "Systems", HelpPlaceholder = "<calling_conv>",
+    [ArgAttributeHelp("Select calling convention", "Systems", HelpPlaceholder = "<calling_convention>",
     ValueDescriptions = [
         "",
         "C default calling convention",
@@ -58,6 +62,29 @@ public class Arguments
     [ArgAttributeHelp("Adds an extension into the program", "Systems", HelpPlaceholder = "<module>", ShowByDefault = true, ShowList = false)]
     public List<string> Extensions { get; set; }
 
+    [Arg("", "--fat-string")]
+    [ArgAttributeHelp("Uses the string struct for String types", "Systems", ShowByDefault = true, ShowList = false)]
+    [DefaultValue(false)]
+    public bool UseFatStrings { get; set; } = false;
+
+    [DefaultValue(false)]
+    public bool OneCharNewLine { get; set; } = false;
+
+    [Arg("", "--dump-tokens")]
+    [DefaultValue(false)]
+    public bool dumpTokens { get; set; } = false;
+    [Arg("", "--json")]
+    [DefaultValue(false)]
+    public bool json { get; set; } = false;
+
+    [Arg("", "--disable-debug-print-out")]
+    [DefaultValue(false)]
+    public bool disableDebugPrinting { get; set; } = false;
+
+    [Arg("-debug", "")]
+    [DefaultValue(true)]
+    public bool debug { get; set; }
+
 }
 
 /*
@@ -67,20 +94,46 @@ for AMD64   --bits 64 --arch amd
 
 public class Program
 {
+    public static Arguments Arguments;
     public static void Main(string[] args)
     {
-        Arguments arguments = EasyArgs.Parse<Arguments>(args);
-        
-        string src = File.ReadAllText(arguments.InputFile);
+        TangoFlexPreprocessor preprocessor;
+        TangoFlexLexer tangoFlexLexer;
+        Arguments = EasyArgs.Parse<Arguments>(args);
 
-        TangoFlexPreprocessor preprocessor = new TangoFlexPreprocessor(src, arguments);
-        TangoFlexLexer tangoFlexLexer = new TangoFlexLexer(preprocessor.Source, arguments);
-        TangoFlexPreprocessorEval tangoFlexPreprocessorEval = new TangoFlexPreprocessorEval(tangoFlexLexer.Tokens.ToArray(), arguments);
-        TangoFlexParser tangoFlexParser = new TangoFlexParser(tangoFlexPreprocessorEval.tokenOut, arguments);
-        TangoFlexIRParser tangoFlexIRParser = new TangoFlexIRParser(tangoFlexParser.AST, arguments);
-        TangoFlexGenerator tangoFlexGenerator = new TangoFlexGenerator(tangoFlexIRParser.Module, arguments);
-        File.WriteAllText(arguments.OutputFile, string.Join(Environment.NewLine, tangoFlexGenerator.Output));
+        DebugConsole.InitDebugging(Arguments);
 
-        Console.WriteLine("Hello world");
+
+        if (Arguments.dumpTokens == false && Arguments.json == false)
+        {
+            string src = File.ReadAllText(Arguments.InputFile);
+            preprocessor = new TangoFlexPreprocessor(src, Arguments);
+            tangoFlexLexer = new TangoFlexLexer(preprocessor.Source, Arguments);
+            // 1. the one input file that is it
+            TangoFlexPreprocessorEval tangoFlexPreprocessorEval = new TangoFlexPreprocessorEval(tangoFlexLexer.Tokens.ToArray(), tangoFlexLexer, preprocessor, Arguments);
+            // 2. now with all extensions and includes
+            TangoFlexParser tangoFlexParser = new TangoFlexParser(tangoFlexPreprocessorEval.tokenOut, Arguments);
+            TangoFlexIRParser tangoFlexIRParser = new TangoFlexIRParser(tangoFlexParser.AST, Arguments);
+            TangoFlexGenerator tangoFlexGenerator = new TangoFlexGenerator(tangoFlexIRParser.Module, Arguments);
+            File.WriteAllText(Arguments.OutputFile, string.Join(Environment.NewLine, tangoFlexGenerator.Output));
+        }
+        else
+        {
+            Arguments.disableDebugPrinting = true;
+            Arguments.debug = false;
+            // Lexer shit
+            string src = Console.In.ReadToEnd();
+            preprocessor = new TangoFlexPreprocessor(src, Arguments);
+            tangoFlexLexer = new TangoFlexLexer(preprocessor.Source, Arguments);
+            JsonSerializerOptions serializerOptions = new JsonSerializerOptions()
+            {
+                MaxDepth = 64,
+                ReferenceHandler = ReferenceHandler.IgnoreCycles
+            };
+            serializerOptions.Converters.Add(new JsonStringEnumConverter());
+            string json = JsonSerializer.Serialize(tangoFlexLexer.Tokens, serializerOptions);
+
+            Console.Out.WriteLine(json);
+        }
     }
 }

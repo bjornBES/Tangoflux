@@ -1,6 +1,6 @@
 #namespace io
 
-#inclued once
+#included once
 
 #if __windows__
 

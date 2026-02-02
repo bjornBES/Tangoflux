@@ -13,10 +13,15 @@ namespace CompilerTangoFlex.lexer {
         public override TokenKind Kind { get; } = TokenKind.CHAR;
         public string Raw { get; }
         public char Value { get; }
-        public override string ToString() => $"({Line}:{Column}): " + $"{Kind}: '{Raw}'";
+        public override string ToString() => $"({File}:{Line}:{Column}): " + $"{Kind}: '{Raw}'";
         public override Token Clone()
         {
             return new TokenCharConst(Raw, Value);
+        }
+
+        public override object GetData()
+        {
+            return Value;
         }
     }
 
@@ -256,7 +261,7 @@ namespace CompilerTangoFlex.lexer {
     /// FSACharConst
     /// ============
     /// The FSA for scanning a C character constant.
-    /// Upon finish, we can retrive a token of character.
+    /// Upon finish, we can retrieve a token of character.
     /// 
     /// A character constant can either be represented by
     /// * '[char]'
