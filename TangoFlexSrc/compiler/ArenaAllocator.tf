@@ -4,6 +4,11 @@ struct public Arena {
     var end : uint8 ptr
 }
 
+func public os_alloc(size : uint64) : uint32
+{
+    
+}
+
 func public arena_init(a : Arena ptr, size : uint64) : void {
     a->base = os_alloc(size)   // mmap / VirtualAlloc
     a->ptr  = a->base

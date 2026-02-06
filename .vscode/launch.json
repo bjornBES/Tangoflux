@@ -9,7 +9,7 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/bin/Debug/net9.0/Tangoflux",
+            "program": "${workspaceFolder}/TangoFlexCompiler/bin/Debug/net9.0/TangoFlexCompiler",
             "args": [
                 "./TangoFlexSrc/test.tf",
                 "-o", "./outputs/test1.asm",
@@ -26,7 +26,7 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/bin/Debug/net9.0/Tangoflux",
+            "program": "${workspaceFolder}/TangoFlexCompiler/bin/Debug/net9.0/TangoFlexCompiler",
             "args": [
                 "-h"
             ],

@@ -1,0 +1,40 @@
+
+using System.Text.Json.Serialization;
+using TangoFlexCompiler;
+using TangoFlexCompiler.Parser.Nodes.Stmts;
+
+namespace TangoFlexCompiler.Parser.Nodes
+{
+    [JsonPolymorphic(TypeDiscriminatorPropertyName = "$type")]
+    [JsonDerivedType(typeof(NodeStmtReturn), "NodeStmtReturn")]
+    [JsonDerivedType(typeof(NodeStmtVarDecl), "NodeStmtVarDecl")]
+    [JsonDerivedType(typeof(NodeStmtFuncDecl), "NodeFuncDecl")]
+    [JsonDerivedType(typeof(NodeStmtIf), "NodeStmtIf")]
+    [JsonDerivedType(typeof(NodeStmtScope), "NodeScope")]
+    [JsonDerivedType(typeof(NodeStmtForLoop), "NodeStmtForLoop")]
+    [JsonDerivedType(typeof(NodeStmtVarReassign), "NodeStmtVarReassign")]
+    [JsonDerivedType(typeof(NodeStmtWhileLoop), "NodeStmtWhileLoop")]
+    [JsonDerivedType(typeof(NodeStmtCallFunction), "NodeStmtCallFunction")]
+    [JsonDerivedType(typeof(NodeStmtExternal), "NodeStmtExternal")]
+    [JsonDerivedType(typeof(NodeStmtExpr), "NodeStmtExpr")]
+    [JsonDerivedType(typeof(NodeStmtNamespace), "NodeStmtNamespace")]
+    public abstract class IStmt
+    {
+        public SourceSpan SourceSpan { get; set; }
+    }
+
+    public class NodeStmt
+    {
+        public IStmt Stmt { get; set; }
+        public bool GetTrueType<T>(out T out_stmt) where T : IStmt
+        {
+            if (Stmt is T inst)
+            {
+                out_stmt = inst;
+                return true;
+            }
+            out_stmt = default;
+            return false;
+        }
+    }
+}

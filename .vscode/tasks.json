@@ -3,8 +3,8 @@
 	"tasks": [
 		{
 			"type": "dotnet",
-			"task": "build ${workspaceFolder}/Tangoflux.csproj",
-			"file": "${workspaceFolder}/Tangoflux.csproj",
+			"task": "build ${workspaceFolder}/TangoFlexCompiler/TangoFlexCompiler.csproj",
+			"file": "${workspaceFolder}/TangoFlexCompiler/TangoFlexCompiler.csproj",
 			"group": "build",
 			"problemMatcher": [],
 			"label": "build"

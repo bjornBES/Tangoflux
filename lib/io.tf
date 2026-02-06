@@ -1,4 +1,5 @@
 #namespace io
+{
 
 #included once
 
@@ -41,4 +42,5 @@ func public exit(exitCode : uint32) : void
     #if __unix__
     @systemcall(@cast(uint32, 60), exitCode)
     #endif
+}
 }

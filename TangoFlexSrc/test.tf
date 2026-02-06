@@ -18,7 +18,7 @@ func main(argv : uint8 ptr ptr, argc : int32) : int32
     var sum : int64 = 0
     var arr : int32 ptr = 0x1000
 
-    for (var i : int32 = -5 .. 5 step 1)
+     for (var i : int32 = -5 .. 5 step 1)
     {
         sum += i
         while (x < 0)
